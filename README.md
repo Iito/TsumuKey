@@ -39,9 +39,9 @@ A kana flick pad and a romaji keyboard are there too, converted with azooKey.
 
 ### Layouts, symbols, menu
 
-| Hold ⚙︎: your layouts | Hold A: its symbol right above | Hold P near the edge |
-|---|---|---|
-| <img src="docs/media/menu.png" width="260"> | <img src="docs/media/longpress.png" width="260"> | <img src="docs/media/longpress-edge.png" width="260"> |
+| Hold ⚙︎: your layouts | Hold A: its symbol right above, accents next to it |
+|---|---|
+| <img src="docs/media/menu.png" width="300"> | <img src="docs/media/longpress.png" width="300"> |
 
 QWERTY, Colemak, AZERTY, QWERTZ and Dvorak; keep up to three in the menu, the first
 is the default. Every key carries a symbol in its corner and long-press puts it

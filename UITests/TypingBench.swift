@@ -242,10 +242,10 @@ final class TypingBench: XCTestCase {
     func testMenuAndLanguages() throws {
         at(79, 856).press(forDuration: 2.5)
         sleep(1)
-        // Long-press a left-edge and a right-edge letter (QWERTY a, p; number row on).
+        // Long-press a left-edge letter and one near the right edge with many options (QWERTY a, o; number row on).
         at(24.7, 756).press(forDuration: 2.0)
         sleep(1)
-        at(415, 706).press(forDuration: 2.0)
+        at(371.6, 706).press(forDuration: 2.0)   // O: 9 options, opens leftward
         sleep(1)
         shot("longpress")
         let cases = (ProcessInfo.processInfo.environment["LANGCASES"] ?? "").split(separator: ";")

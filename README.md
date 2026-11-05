@@ -77,14 +77,17 @@ a keyboard's 76 MB limit allows next to everything else, so the vocabulary is cu
 to the tokens these languages use. Bits per character on held-out Wikipedia and
 Tatoeba text (lower is better):
 
-| Model | Vocabulary | English | French | EN+FR mixed |
-|---|---|---|---|---|
-| Gemma 3 270M (QAT, Q4_0) | 262k | 1.089 | 1.252 | 1.739 |
-| Cut to English + French | 32k | 1.271 | 1.326 | 1.774 |
-| Cut to English + French | 48k | 1.176 | 1.281 | 1.750 |
-| **Cut to EN + FR + DE + ES (shipped)** | **64k** | *pending* | *pending* | *pending* |
+| Model | Vocabulary | Size | English | French | German | Spanish | EN+FR mixed |
+|---|---|---|---|---|---|---|---|
+| Gemma 3 270M (QAT, Q4_0) | 262k | 230 MB | 1.088 | 1.259 | 1.300 | 1.265 | 1.748 |
+| Cut to English + French | 48k | 87 MB | 1.174 | 1.287 | 2.430 | 2.228 | 1.753 |
+| **Cut to EN + FR + DE + ES (shipped)** | **64k** | **102 MB** | **1.175** | **1.282** | **1.325** | **1.292** | **1.758** |
+| LFM2.5 350M Base (Q4_0), for comparison | 65k | 219 MB | 1.139 | 1.239 | 1.251 | 1.305 | 1.837 |
 
-German and Spanish scores for the shipped model are being measured.
+Cutting to 64k costs 2–8% against the full model and keeps German and Spanish
+(the English + French cut was ~85% worse on them). LFM2.5 350M is 3–6% better on
+single-language English, French and German text but worse on Spanish and on mixed
+sentences, at twice the size, so the keyboard stays on Gemma.
 
 ### On the phone
 

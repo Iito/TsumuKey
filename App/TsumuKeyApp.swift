@@ -160,6 +160,10 @@ struct ContentView: View {
                 // UI tests: "-layout dvorak" switches the letter layout.
                 if let name = UserDefaults.standard.string(forKey: "layout"),
                    let layout = LetterLayout(rawValue: name) { settings.layout = layout; settings.save() }
+                // UI tests: "-numberRow 0|1" and "-symbolHints 0|1" (README screenshots).
+                let args = UserDefaults.standard
+                if args.object(forKey: "numberRow") != nil { settings.numberRow = args.bool(forKey: "numberRow"); settings.save() }
+                if args.object(forKey: "symbolHints") != nil { settings.showSymbolHints = args.bool(forKey: "symbolHints"); settings.save() }
                 // UI tests: "-languages de,en" picks the prediction languages.
                 if let codes = UserDefaults.standard.string(forKey: "languages") {
                     let picked = codes.split(separator: ",").compactMap { PredictionLanguage(rawValue: String($0)) }

@@ -265,6 +265,22 @@ final class TypingBench: XCTestCase {
         if ProcessInfo.processInfo.environment["KEEPVIDEO"] != nil { XCTFail("keep the recording") }
     }
 
+    /// README screenshots: the keyboard with and without the number row,
+    /// with and without corner symbols. Ends with both on (the defaults).
+    func testRowAndHintShots() throws {
+        for (row, hints) in [(1, 1), (0, 1), (1, 0), (0, 0)] {
+            app.terminate()
+            app.launchArguments = ["-autofocus", "-numberRow", "\(row)", "-symbolHints", "\(hints)"]
+            app.launch()
+            sleep(3)
+            shot("row\(row)-hints\(hints)")
+        }
+        app.terminate()
+        app.launchArguments = ["-numberRow", "1", "-symbolHints", "1"]
+        app.launch()
+        sleep(2)
+    }
+
     private func shot(_ name: String) {
         let a = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         a.name = name

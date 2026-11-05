@@ -1,0 +1,17 @@
+# Build output and the generated Xcode project (run `xcodegen generate`).
+build*/
+*.xcodeproj/
+DerivedData/
+.DS_Store
+xcuserdata/
+
+# Models: only the one the keyboard ships is kept. The full Gemma 3 270M
+# (230 MB, over GitHub's 100 MB limit) and older pruned vocabularies can be
+# rebuilt with Tools/prune_vocab.py.
+Models/gemma-3-270m-qat-Q4_0.gguf
+Models/gemma-3-270m-enfr32k-Q4_0.gguf
+Models/gemma-3-270m-enfr48k-Q4_0.gguf
+Models/lexicon-enfr.bin
+
+# Old llama.cpp xcframework, replaced by Vendor/llama-cpu (Tools/build_llama_ios.sh).
+Vendor/llama/

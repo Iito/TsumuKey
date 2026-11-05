@@ -2,33 +2,94 @@
 
 An iOS keyboard for people who type in several languages at once.
 *Tsumugi* (紡ぎ) is Japanese for weaving thread: TsumuKey weaves your
-languages into one keyboard, with no switching.
+languages into one keyboard, with no switching. Everything runs on the phone.
 
-Everything runs on the phone. No text leaves the device.
+## See it
 
-## Features
+<p align="center"><img src="docs/media/demo.gif" width="360" alt="Typing hello wrold, autocorrected to Hello world.; a period pulling the space away; romaji converted to Japanese; numpad and symbols; Colemak, QWERTZ and Dvorak layouts"></p>
 
-- **Multilingual prediction and autocorrect.** Pick any two of English,
-  French, German and Spanish; suggestions mix them as you type. An on-device
-  language model (Gemma 3 270M, vocabulary pruned to these four languages)
-  scores every candidate.
-- **Tap-aware corrections.** A tap is a point, not a letter: candidates are
-  scored on where your finger actually landed plus how likely the word is
-  in context, so slips like "wrold" become "world".
-- **Learns your words.** Undo an autocorrection with backspace, or pick the
-  word as typed, and it is never corrected again ("mcp" stays "mcp").
-- **Japanese.** A kana flick pad or romaji input, converted with azooKey. In
-  the Latin keyboard, romaji you type (watashi) is offered as 私 in the bar.
-- **Layouts.** QWERTY, Colemak, AZERTY, QWERTZ and Dvorak. Keep up to three
-  in the ⚙︎ menu; the first one is the default.
-- **Symbols where your fingers are.** Every key carries a symbol in its
-  corner; long-press puts it right above your finger. Tap 123 for a numpad,
-  hold it for symbols with digits on top.
-- **Looks.** Day, Night (Gboard-like colours) or Match iPhone; colour letters
-  by row, by thumb, or vowels. Custom colours brighten automatically in
-  dark mode.
-- **Small touches.** Punctuation sticks to the word ("word ." → "word."),
-  Gboard-style key popups, a delete key with word-by-word repeat.
+*"hello wrold" becomes "Hello world.", romaji turns into 私は日本語を話す with one tap,
+123 opens a numpad (hold it for symbols), then Colemak, QWERTZ and Dvorak.*
+
+### Two languages at once
+
+Pick any two of English, French, German and Spanish. The bar mixes them as you type;
+the ones you turned off stay out of the way.
+
+| Languages | You type | Bar |
+|---|---|---|
+| German + English | Ich habe heute keine _ | <img src="docs/media/bar-de-keine.png" width="380"> |
+| Spanish + English | Quiero comer una manz_ | <img src="docs/media/bar-es-manz.png" width="380"> |
+| English + French | Ich wohne in einer kleinen Wohnu_ | <img src="docs/media/bar-enfr-wohnu.png" width="380"> |
+
+The last row is German typed with German turned off: no German suggestions.
+
+### Japanese in the Latin keyboard
+
+Type romaji and the red chip offers the Japanese; tap it to swap. Words that are
+English or French put it last instead of first.
+
+| You type | Bar |
+|---|---|
+| watashi | <img src="docs/media/bar-watashi.png" width="380"> |
+| nihongowohanasu | <img src="docs/media/bar-nihongowohanasu.png" width="380"> |
+| gomen | <img src="docs/media/bar-gomen.png" width="380"> |
+
+A kana flick pad and a romaji keyboard are there too, converted with azooKey.
+
+### Layouts, symbols, menu
+
+| Hold ⚙︎: your layouts | Hold A: its symbol right above | Hold P near the edge |
+|---|---|---|
+| <img src="docs/media/menu.png" width="260"> | <img src="docs/media/longpress.png" width="260"> | <img src="docs/media/longpress-edge.png" width="260"> |
+
+QWERTY, Colemak, AZERTY, QWERTZ and Dvorak; keep up to three in the menu, the first
+is the default. Every key carries a symbol in its corner and long-press puts it
+under your finger, accents next to it.
+
+### Also
+
+- **Tap-aware corrections.** A tap is a point, not a letter: each candidate is
+  scored on where your finger landed plus how likely the word is in context.
+- **Learns your words.** Undo an autocorrection with backspace and that word is
+  never corrected again ("mcp" stays "mcp").
+- **Punctuation sticks to the word**: "word ." becomes "word.".
+- **Looks**: Day, Night (Gboard's colours) or Match iPhone; colour letters by row,
+  by thumb or vowels, brightened automatically in dark mode.
+- **On device.** Nothing you type leaves the phone.
+
+## Scores
+
+### Typing accuracy against Gboard
+
+Same simulated taps (noise measured from real taps on the phone) typed on Gboard
+and on this keyboard, Colemak, iPhone 15, 70 English, French and mixed sentences.
+
+| Typing | Gboard | TsumuKey |
+|---|---|---|
+| Careful | 85.5% words right | **90.6%** |
+| Fast | 65.3% | **66.7%** |
+
+### Gemma 3 270M, before and after cutting its vocabulary
+
+The full model's 262k-token vocabulary alone needs ~55 MB on an iPhone, more than
+a keyboard's 76 MB limit allows next to everything else, so the vocabulary is cut
+to the tokens these languages use. Bits per character on held-out Wikipedia and
+Tatoeba text (lower is better):
+
+| Model | Vocabulary | English | French | EN+FR mixed |
+|---|---|---|---|---|
+| Gemma 3 270M (QAT, Q4_0) | 262k | 1.089 | 1.252 | 1.739 |
+| Cut to English + French | 32k | 1.271 | 1.326 | 1.774 |
+| Cut to English + French | 48k | 1.176 | 1.281 | 1.750 |
+| **Cut to EN + FR + DE + ES (shipped)** | **64k** | *pending* | *pending* | *pending* |
+
+German and Spanish scores for the shipped model are being measured.
+
+### On the phone
+
+- Memory: 35–39 MB on an iPhone 15 (limit 76 MB), steady across 20 openings (measured with the 48k model; the 64k one is expected to add ~6 MB).
+- Japanese conversion: 1–26 ms per word; the kana dictionary adds ~4 MB.
 
 ## Building
 

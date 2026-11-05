@@ -87,4 +87,4 @@ See `CHANGELOG.md` for what changed in each build.
 
 ## Licence
 
-TsumuKey's own code is under the MIT licence; see [LICENSE](LICENSE).
+TsumuKey's own code is under the MIT licence; see [LICENSE](LICENSE). Bundled third-party code, data and the model keep their own licences (table above).

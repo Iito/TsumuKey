@@ -82,13 +82,17 @@ struct ModelsSection: View {
     @StateObject private var downloader = ModelDownloader()
 
     private var gemmaInstalled: Bool { _ = downloader.revision; return ModelStore.gemmaURL() != nil }
-    private var round: Int { _ = downloader.revision; return ModelStore.rankerURL()?.round ?? ModelStore.bundledRankerRound }
+    private var smallLabel: String {
+        _ = downloader.revision
+        let info = ModelStore.rankerURL().flatMap { ModelStore.rankerInfo($0.url) }
+        return "Small (\(info?.label ?? "4.5 MB"))"
+    }
 
     var body: some View {
         Section {
             Picker("Correction model", selection: $settings.correctionModel) {
-                Text("Small, round \(round) (4.5 MB)").tag(CorrectionModel.dense)
-                Text(gemmaInstalled ? "Gemma 270M (100 MB)" : "Gemma 270M (not downloaded)").tag(CorrectionModel.gemma)
+                Text(smallLabel).tag(CorrectionModel.dense)
+                Text(gemmaInstalled ? "Gemma 3 (\(ModelStore.gemmaLabel))" : "Gemma 3 (not downloaded)").tag(CorrectionModel.gemma)
                 if !CorrectionModel.choices.contains(settings.correctionModel) {
                     Text(settings.correctionModel.name).tag(settings.correctionModel)  // set by the bench
                 }

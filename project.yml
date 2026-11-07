@@ -13,12 +13,18 @@ settings:
     # vocabulary run ~5x slower unoptimized, which made typing feel laggy.
     SWIFT_OPTIMIZATION_LEVEL: "-O"
     MARKETING_VERSION: "0.5"
-    CURRENT_PROJECT_VERSION: "27"
+    CURRENT_PROJECT_VERSION: "28"
 packages:
   # azooKey's kana-kanji converter (MIT) with its default dictionary.
   AzooKeyKanaKanjiConverter:
-    # Vendored 0.11.2 with Zenzai's llama.cpp removed (see its Package.swift).
-    path: Vendor/AzooKeyKanaKanjiConverter
+    # Fork of 0.11.2 with Zenzai's llama.cpp target removed: Xcode 16 ignores
+    # package traits, so it was linked but never embedded (launch crash).
+    url: https://github.com/Iito/AzooKeyKanaKanjiConverter
+    exactVersion: 0.11.2-tsumukey.1
+  # Pinned: newer releases need Swift tools 6.4, Xcode 16.4 has 6.1.
+  swift-collections:
+    url: https://github.com/apple/swift-collections
+    exactVersion: 1.6.0
 targets:
   TsumuKey:
     type: application

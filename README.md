@@ -110,20 +110,16 @@ read the app's settings.
 
 Install Release builds: the decoder is about five times slower unoptimized.
 
-### Regenerating the model and word list
+### Models and word list
 
-The repository ships the files the keyboard uses
-(`Models/gemma-3-270m-enfrdees64k-Q4_0.gguf`, `Models/lexicon-enfrdees.bin`).
-To rebuild them:
+The app ships the word list (`Models/lexicon-enfrdees.bin`) and the small
+correction model (`Models/ranker-*.rank`). Gemma 3 is downloaded from the
+app, from [Hugging Face](https://huggingface.co/iito-sama/tsumukey-models).
+The scripts that build them and train the small model live in a separate
+repository, tsumukey-train.
 
-- `Tools/prune_vocab.py`: cuts Gemma 3 270M's 262k-token vocabulary down to
-  the tokens a corpus uses (64k for the four languages), so it fits an iOS
-  keyboard's memory limit.
-- `Tools/build_lexicon.py`: builds the word list from
-  [wordfreq](https://github.com/rspeer/wordfreq), with one frequency per
-  language.
-- `Tools/build_llama_ios.sh`: builds llama.cpp as CPU-only static libraries
-  into `Vendor/llama-cpu`.
+`Tools/build_llama_ios.sh` builds llama.cpp as CPU-only static libraries
+into `Vendor/llama-cpu`.
 
 ## Project layout
 
@@ -133,9 +129,9 @@ To rebuild them:
 | `Keyboard/` | The keyboard extension: layouts, touch handling, decoder, model |
 | `Shared/` | Settings shared by the app and the keyboard |
 | `UITests/` | On-device tests, typing benchmark, screenshot and demo runs |
-| `Models/` | Language model and word list |
-| `Tools/` | Scripts that build the model, word list and llama.cpp |
-| `Vendor/` | llama.cpp static libraries, azooKey |
+| `Models/` | Word list and the small correction model |
+| `Tools/` | llama.cpp build script, icon generator |
+| `Vendor/` | llama.cpp static libraries |
 
 See `CHANGELOG.md` for what changed in each build.
 
@@ -144,9 +140,9 @@ See `CHANGELOG.md` for what changed in each build.
 | Component | Licence |
 |---|---|
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) (`Vendor/llama-cpu`) | MIT |
-| [AzooKeyKanaKanjiConverter](https://github.com/azooKey/AzooKeyKanaKanjiConverter) (`Vendor/AzooKeyKanaKanjiConverter`) | MIT |
+| [AzooKeyKanaKanjiConverter](https://github.com/azooKey/AzooKeyKanaKanjiConverter) (Swift package, [patched fork](https://github.com/Iito/AzooKeyKanaKanjiConverter/tree/tsumukey)) | MIT |
 | azooKey's dictionary (inside the converter) | Apache 2.0 |
-| [Gemma 3 270M](https://ai.google.dev/gemma) (`Models/*.gguf`, pruned) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) |
+| [Gemma 3 270M](https://ai.google.dev/gemma) (downloaded, pruned) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) |
 | Word frequencies from [wordfreq](https://github.com/rspeer/wordfreq) (`Models/lexicon-*.bin`) | Apache 2.0 (code); data under CC BY-SA 4.0 |
 
 ## Licence

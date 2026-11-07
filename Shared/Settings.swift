@@ -147,9 +147,9 @@ enum CorrectionModel: String, Codable, CaseIterable, Identifiable {
     var id: Self { self }
     var name: String {
         switch self {
-        case .gemma: return "Gemma 270M (100 MB download)"
-        case .dense: return "Small (4.5 MB)"
-        case .moe: return "Small MoE, round 5 (4.7 MB)"
+        case .gemma: return "Gemma 3 (Transformer 18L × 4H, 141M params)"
+        case .dense: return "Small (Transformer 2L × 4H, 4.3M params)"
+        case .moe: return "Small (Transformer 2L × 4H, MoE 4 experts, 4.4M params)"
         }
     }
 

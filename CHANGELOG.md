@@ -4,6 +4,12 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 28), 2026-11-07
+Installed on the iPhone 15.
+- Models are named by architecture: "Small (Transformer 2L × 4H, 4.3M params)", read from
+  the .rank file's header, and "Gemma 3 (Transformer 18L × 4H, 141M params)" (vocabulary
+  pruned to 64k, so not 270M). Same names in the Hugging Face models.json.
+
 ## 0.5 (build 27), 2026-11-07
 Installed on the iPhone 15. First build with the real TsumuKey IDs (com.tsumukey,
 com.tsumukey.keyboard) and the App Group group.com.tsumukey, so it installs as a new

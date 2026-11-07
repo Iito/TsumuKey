@@ -213,7 +213,7 @@ final class Ranker: WordScorer {
     }
 
     private func block(_ b: Block, _ x: [Float], pad: Int) -> [Float] {
-        let T = ctxLen, d = dim, heads = 4, hd = dim / 4
+        let T = ctxLen, d = dim, heads = ModelStore.rankerHeads, hd = dim / heads
         var x = x
         var qkv = [Float](repeating: 0, count: T * 3 * d)
         for t in pad..<T {

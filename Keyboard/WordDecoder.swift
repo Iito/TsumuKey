@@ -30,12 +30,30 @@ struct DecodeResult {
     var log: String
 }
 
+/// What the decoder needs from a model: how likely each candidate word is
+/// after the current context (log-probabilities, in nats), and guesses for
+/// the next word. Gemma (LanguageModel) and the small ranker both provide it.
+protocol WordScorer: AnyObject {
+    @discardableResult func setContext(_ text: String) -> Bool
+    /// Full score of each word as the next word.
+    func score(_ words: [String], leadingSpace: Bool) -> [Float]
+    /// Cheaper estimate, used to pick which candidates get the full score.
+    func quickScore(_ words: [String], leadingSpace: Bool) -> [Float]
+    func predict(count: Int, leadingSpace: Bool) -> [String]
+    /// The word as typed (lowercased) and whether it's a real word, before scoring it and its fixes.
+    func setTyped(_ word: String, isWord: Bool)
+}
+
+extension WordScorer {
+    func setTyped(_ word: String, isWord: Bool) {}
+}
+
 /// Turns taps into words the way Gboard does: a tap isn't a letter, it's a
 /// point that's probably that key and maybe a neighbour. Each candidate word
 /// gets a score for how well its keys match where the fingers landed, plus
 /// how likely the language model finds it here; the best total wins.
 final class WordDecoder {
-    let lm: LanguageModel
+    let lm: WordScorer
     let lexicon: Lexicon
     /// French elisions ("menvoyer" → "m'envoyer") only when French is on.
     var french = true
@@ -45,9 +63,9 @@ final class WordDecoder {
     static let editCost: Float = 5
     /// How much better a fix must score to replace a real word. Real words
     /// are usually meant, and a wrong "fix" is worse than a typo.
-    static let replaceRealWordMargin: Float = 4.5
+    static var replaceRealWordMargin: Float = 4.5
     /// Same, when the typed word isn't a word in either language.
-    static let replaceTypoMargin: Float = 0.5
+    static var replaceTypoMargin: Float = 0.5
     /// Candidates too far from the taps aren't fixes, they're other words.
     static let worstSpatial: Float = -12
     /// Same letters, different accents or apostrophe ("a" → "à"), when what
@@ -66,7 +84,7 @@ final class WordDecoder {
     /// 48k-way output dominates), so only the best few get it.
     static let fullFixes = 6
 
-    init(lm: LanguageModel, lexicon: Lexicon) {
+    init(lm: WordScorer, lexicon: Lexicon) {
         self.lm = lm
         self.lexicon = lexicon
     }
@@ -84,7 +102,7 @@ final class WordDecoder {
             // The model knows all four languages; keep its guesses to the
             // enabled ones (a word with no key, like "2024", always passes).
             let predictions = ((leadingSpace || context.isEmpty)
-                ? lm.predict(leadingSpace: leadingSpace && !context.isEmpty) : [])
+                ? lm.predict(count: 3, leadingSpace: leadingSpace && !context.isEmpty) : [])
                 .filter { Lexicon.key($0).map(lexicon.contains) ?? true }
             return DecodeResult(word: "", correction: nil, suggestions: predictions,
                                 log: "PREDICT \(predictions) \(ms(started, Date()))ms")
@@ -93,26 +111,14 @@ final class WordDecoder {
         guard let typedKey = Lexicon.key(typed) else {
             return DecodeResult(word: r.word, correction: nil, suggestions: [], log: "DECODE \(r.word) skipped")
         }
-        let taps = Self.align(r.taps, to: typedKey, keys: r.keys)
-        let typedIsWord = lexicon.lookup(typedKey).contains { $0.word == typed }
-
-        // Real words the taps could have meant: a walk over the whole word
-        // list, so several slips in one word are found, plus single edits
-        // (swapped letters are cheap to type, costly in the walk).
-        var spatialCache = search(taps, keys: r.keys, threshold: Self.worstSpatial)
-        for (k, _) in spatialCache.sorted(by: { $0.value > $1.value }).dropFirst(Self.maxCandidates) {
-            spatialCache[k] = nil
-        }
-        var keyOf: [String: String] = [:]
-        for k in Set(spatialCache.keys).union(editKeys(typedKey, taps: taps, keys: r.keys)) {
-            for e in lexicon.lookup(k) where e.word != typed && keyOf[e.word] == nil { keyOf[e.word] = k }
-        }
-        for (word, key) in elided(taps, keys: r.keys) where word != typed && keyOf[word] == nil {
-            keyOf[word] = key
-        }
+        let gen = generate(r, typed: typed, typedKey: typedKey)
+        let typedIsWord = gen.typedIsWord
+        lm.setTyped(typed, isWord: typedIsWord)
+        let keyOf = gen.keyOf
+        var spatialCache = gen.spatial
         let spatialOf = { (k: String) -> Float in
             if let v = spatialCache[k] { return v }
-            let v = Self.spatial(k, taps: taps, keys: r.keys)
+            let v = Self.spatial(k, taps: gen.taps, keys: r.keys)
             spatialCache[k] = v
             return v
         }
@@ -192,6 +198,49 @@ final class WordDecoder {
     }
 
     // MARK: Candidates
+
+    struct Generated {
+        var taps: [Tap]
+        var typedIsWord: Bool
+        /// Candidate word -> its key (letters a-z) in the word list.
+        var keyOf: [String: String]
+        /// Key -> how well it fits the taps (nats), for every candidate key and the typed one.
+        var spatial: [String: Float]
+    }
+
+    private func generate(_ r: DecodeRequest, typed: String, typedKey: String) -> Generated {
+        let taps = Self.align(r.taps, to: typedKey, keys: r.keys)
+        let typedIsWord = lexicon.lookup(typedKey).contains { $0.word == typed }
+
+        // Real words the taps could have meant: a walk over the whole word
+        // list, so several slips in one word are found, plus single edits
+        // (swapped letters are cheap to type, costly in the walk).
+        var spatial = search(taps, keys: r.keys, threshold: Self.worstSpatial)
+        for (k, _) in spatial.sorted(by: { $0.value > $1.value }).dropFirst(Self.maxCandidates) {
+            spatial[k] = nil
+        }
+        var keyOf: [String: String] = [:]
+        for k in Set(spatial.keys).union(editKeys(typedKey, taps: taps, keys: r.keys)) {
+            for e in lexicon.lookup(k) where e.word != typed && keyOf[e.word] == nil { keyOf[e.word] = k }
+        }
+        for (word, key) in elided(taps, keys: r.keys) where word != typed && keyOf[word] == nil {
+            keyOf[word] = key
+        }
+        for k in Set(keyOf.values).union([typedKey]) where spatial[k] == nil {
+            spatial[k] = Self.spatial(k, taps: taps, keys: r.keys)
+        }
+        return Generated(taps: taps, typedIsWord: typedIsWord, keyOf: keyOf, spatial: spatial)
+    }
+
+    /// For training the ranker offline: the typed word and every candidate the
+    /// model would get to judge, each with its fit to the taps.
+    func candidates(_ r: DecodeRequest) -> (typed: String, typedIsWord: Bool, words: [(String, Float)])? {
+        let typed = r.word.lowercased()
+        guard let typedKey = Lexicon.key(typed) else { return nil }
+        let g = generate(r, typed: typed, typedKey: typedKey)
+        let close = g.keyOf.compactMap { w, k in g.spatial[k].flatMap { $0 > Self.worstSpatial ? (w, $0) : nil } }
+        return (typed, g.typedIsWord, [(typed, g.spatial[typedKey]!)] + close)
+    }
 
     /// Every word-list key whose letters fit the taps with a spatial score
     /// of at least `threshold`, and that score. Same alignment as `spatial`,

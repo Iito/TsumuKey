@@ -16,6 +16,10 @@ final class TypingBench: XCTestCase {
         continueAfterFailure = true
         app = XCUIApplication()
         app.launchArguments = ["-autofocus"]
+        // BENCH_MODEL gemma|dense|moe picks the correction model; BENCH_LAYOUT the letter layout.
+        let env = ProcessInfo.processInfo.environment
+        if let m = env["BENCH_MODEL"] { app.launchArguments += ["-model", m] }
+        if let l = env["BENCH_LAYOUT"] { app.launchArguments += ["-layout", l] }
         app.launch()
         sleep(2)
     }
@@ -28,6 +32,12 @@ final class TypingBench: XCTestCase {
 
     private func at(_ x: CGFloat, _ y: CGFloat) -> XCUICoordinate {
         app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y))
+    }
+
+    /// Locks the phone after a bench run (the side button; XCUIDevice has no
+    /// public call for it).
+    func testLockPhone() {
+        XCUIDevice.shared.perform(NSSelectorFromString("pressLockButton"))
     }
 
     /// Screenshot of the keyboard for measuring key positions.

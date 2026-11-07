@@ -79,6 +79,8 @@ struct KeyboardSettings: Codable, Equatable {
     /// Languages the bar and autocorrect use: 1 or 2. More would make
     /// autocorrect swap right words for look-alikes in another language.
     var predictionLanguages: [PredictionLanguage] = [.english, .french]
+    /// Which model judges corrections (Gemma, or a small ranker; bench option).
+    var correctionModel: CorrectionModel = .dense
 
     static let maxMenuLayouts = 3
     static let maxPredictionLanguages = 2
@@ -108,6 +110,7 @@ struct KeyboardSettings: Codable, Equatable {
         menuLayouts = menu.isEmpty ? d.menuLayouts : Array(menu.prefix(Self.maxMenuLayouts))
         let languages = try c.decodeIfPresent([PredictionLanguage].self, forKey: .predictionLanguages) ?? d.predictionLanguages
         predictionLanguages = languages.isEmpty ? d.predictionLanguages : Array(languages.prefix(Self.maxPredictionLanguages))
+        correctionModel = try c.decodeIfPresent(CorrectionModel.self, forKey: .correctionModel) ?? d.correctionModel
     }
 
     static let currencies = ["$", "€", "£", "¥", "₹", "₩", "₽", "₺", "₿", "¢"]
@@ -133,6 +136,25 @@ enum PredictionLanguage: String, Codable, CaseIterable, Identifiable {
     }
     /// Bit in the word list's per-word language mask (Tools/build_lexicon.py).
     var bit: UInt8 { 1 << UInt8(Self.allCases.firstIndex(of: self)!) }
+}
+
+/// Gemma 3 270M (~100 MB), or a ~5 MB candidate ranker (tsumukey-train repo):
+/// dense head, or mixture-of-experts head. Names carry the training round of the
+/// bundled .rank file: update them when Models/ranker-*.rank changes.
+enum CorrectionModel: String, Codable, CaseIterable, Identifiable {
+    case gemma, dense, moe
+
+    var id: Self { self }
+    var name: String {
+        switch self {
+        case .gemma: return "Gemma 270M (100 MB download)"
+        case .dense: return "Small (4.5 MB)"
+        case .moe: return "Small MoE, round 5 (4.7 MB)"
+        }
+    }
+
+    /// What the picker offers; the MoE ranker has no suggestions and stays bench-only.
+    static let choices: [CorrectionModel] = [.dense, .gemma]
 }
 
 enum JapaneseInput: String, Codable, CaseIterable, Identifiable {

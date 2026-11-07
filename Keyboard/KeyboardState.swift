@@ -79,6 +79,7 @@ final class KeyboardState: ObservableObject {
             if settings.japaneseInLatin { KanaConverter.shared.load() } else { KanaConverter.shared.unload() }
             Suggester.languages = settings.predictionLanguages
             predictor.setLanguages(settings.predictionLanguages)
+            predictor.setModel(settings.correctionModel)
             predictor.load()
         }
     }

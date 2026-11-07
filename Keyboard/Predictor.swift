@@ -18,6 +18,7 @@ final class Predictor {
     private var latestRefresh = 0              // guarded by `lock`
     private let lock = NSLock()
     private var languages: [PredictionLanguage] = [.english, .french]  // queue only
+    private var model: CorrectionModel = .dense  // queue only
     /// Set on the main thread once the model is ready.
     private(set) var isReady = false
 
@@ -25,12 +26,11 @@ final class Predictor {
         queue.async { [self] in
             guard decoder == nil, !loadFailed else { return }
             let started = Date()
-            guard let path = Bundle.main.path(forResource: Self.modelName, ofType: "gguf"),
-                  let words = Bundle.main.url(forResource: "lexicon-enfrdees", withExtension: "bin"),
+            guard let words = Bundle.main.url(forResource: "lexicon-enfrdees", withExtension: "bin"),
                   let lexicon = Lexicon(url: words),
-                  let lm = LanguageModel(path: path) else {
+                  let lm = makeScorer(lexicon) else {
                 loadFailed = true
-                TouchLog.log("LM load failed")
+                TouchLog.log("LM load failed (\(model.rawValue))")
                 return
             }
             decoder = WordDecoder(lm: lm, lexicon: lexicon)
@@ -41,6 +41,36 @@ final class Predictor {
     }
 
     /// Which languages predictions and corrections use (settings).
+    /// Switches the correction model; the next `load` brings up the new one.
+    func setModel(_ new: CorrectionModel) {
+        queue.async { [self] in
+            guard new != model else { return }
+            model = new
+            decoder = nil
+            loadFailed = false
+            DispatchQueue.main.async { self.isReady = false }
+        }
+    }
+
+    private func makeScorer(_ lexicon: Lexicon) -> WordScorer? {  // queue only
+        switch model {
+        case .gemma:
+            // Downloaded by the app (ModelStore); falls back to the small ranker
+            // so the keyboard still corrects when Gemma isn't there.
+            if let path = ModelStore.gemmaURL()?.path, let lm = LanguageModel(path: path) { return lm }
+            TouchLog.log("Gemma not downloaded, using the small ranker")
+            guard let url = ModelStore.rankerURL()?.url, let r = Ranker(url: url) else { return nil }
+            r.lexicon = lexicon
+            return r
+        case .dense, .moe:
+            let bundledMoE = model == .moe ? Bundle.main.url(forResource: "ranker-moe", withExtension: "rank") : nil
+            guard let url = bundledMoE ?? ModelStore.rankerURL()?.url,
+                  let r = Ranker(url: url) else { return nil }
+            r.lexicon = lexicon
+            return r
+        }
+    }
+
     func setLanguages(_ new: [PredictionLanguage]) {
         queue.async { [self] in
             guard new != languages else { return }
@@ -52,6 +82,7 @@ final class Predictor {
     private func apply() {  // queue only
         decoder?.lexicon.languages = languages.reduce(0) { $0 | $1.bit }
         decoder?.french = languages.contains(.french)
+        (decoder?.lm as? Ranker)?.languages = languages
     }
 
     /// Gemma 3 270M with its vocabulary cut to English, French, German and

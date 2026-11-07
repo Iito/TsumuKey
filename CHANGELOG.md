@@ -4,6 +4,60 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 27), 2026-11-07
+Installed on the iPhone 15. First build with the real TsumuKey IDs (com.tsumukey,
+com.tsumukey.keyboard) and the App Group group.com.tsumukey, so it installs as a new
+app next to the old BetterKeys-ID one.
+- Models download on request from the public Hugging Face repo iito-sama/tsumukey-models
+  (models.json lists file, size, SHA-256, minimum build). The app downloads into the App
+  Group folder and checks the checksum; the keyboard loads from there (Shared/ModelStore.swift,
+  App/ModelsSection.swift). A downloaded ranker-rN.rank replaces the built-in one.
+- Gemma is no longer bundled: app 171 MB -> 74 MB. Choosing Gemma before it's downloaded
+  keeps the small model.
+- Settings: "Correction model" section with the picker (Small, round 7 / Gemma), the model
+  list with Download / Delete, and progress.
+
+## 0.5 (build 26), 2026-11-07
+Installed on the iPhone 15 (bench project with the old BetterKeys IDs, see build 22).
+- "Correction model" picker in the app's settings, naming the bundled model and its
+  training round: Small, round 7 (4.5 MB) or Gemma 270M (100 MB). MoE stays bench-only.
+- Round-7 ranker (Models/ranker-dense.rank): adds a task flag (correcting vs suggesting).
+  Mac test set: corrections 95.5% / 86.9% careful / fast, suggestions top-3 26.0%
+  (Gemma 91.8% / 78.0%, 30.2%).
+
+## 0.5 (build 25), 2026-11-07
+Installed on the iPhone 15 (bench project with the old BetterKeys IDs, see build 22).
+- Correction model now defaults to the small dense ranker (round 6, Models/ranker-dense.rank),
+  which also gives next-word suggestions (Ranker.predict: ranks the 2000 most frequent
+  words of the enabled languages). Gemma stays bundled as an option.
+- Round 6 = round-5 data plus a next-word example per word. Mac test set, 12,351 words:
+  suggestions top-3 25.8% (Gemma 30.2%), corrections 94.7% / 84.4% careful / fast
+  (round 5: 95.5% / 86.6%, Gemma 91.8% / 78.0%).
+
+## 0.5 (build 24), 2026-11-07
+Bench build, installed on the iPhone 16 Pro Max (bench project with the old BetterKeys IDs, see build 22).
+- Round-5 rankers bundled (Models/ranker-dense.rank, ranker-moe.rank): trained on 4.94M
+  words, 5x round 3. Mac test set, 12,351 words (careful / fast): dense 95.5% / 86.6%,
+  MoE 95.4% / 86.6%, Gemma 91.8% / 78.0%; 10 ms per word vs Gemma's 104 ms.
+- On-phone bench, iPhone 16 Pro Max, Colemak, 606 words (careful / fast): r5 dense
+  90.8% / 68.6%, r5 MoE 90.6% / 69.1%, Gemma 90.4% / 66.7% (Gemma re-run on this build).
+  Default stays Gemma.
+
+## 0.5 (build 23), 2026-11-07
+Installed on the iPhone 15, then on the iPhone 16 Pro Max by the lock-phone test run (bench project with the old BetterKeys IDs, see build 22).
+- New app icon: a keycap whose "t" runs off the key as thread (Tools/make_icon.swift).
+
+## 0.5 (build 22), 2026-11-07
+Bench build, installed on the iPhone 16 Pro Max (on-phone typing bench) and the iPhone 15.
+Built from a copy of project.yml with the old com.example.betterkeys IDs, because the
+TsumuKey IDs have no signing profiles yet; the repo keeps the TsumuKey IDs.
+- Correction model setting (Gemma 270M, or a ~4.6 MB candidate ranker with a dense or
+  mixture-of-experts head, Tools/rank). "-model gemma|dense|moe" launch argument; the
+  UI bench passes it with BENCH_MODEL. Default stays Gemma.
+- On-phone bench, iPhone 16 Pro Max, Colemak, 606 words (careful / fast words right):
+  Gemma 90.4% / 66.8%, dense ranker 90.6% / 67.7%, MoE ranker 90.3% / 67.5%.
+- UI test testLockPhone locks the phone after a bench run.
+
 ## 0.5 (build 21), 2026-11-05
 - Renamed BetterKeys → TsumuKey (紡ぎ "weaving" + key). New IDs without a personal
   name: app com.tsumukey, keyboard com.tsumukey.keyboard, UI tests

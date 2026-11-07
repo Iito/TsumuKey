@@ -53,6 +53,24 @@ final class Lexicon {
         return out.count > 1 ? out.sorted { $0.zipf > $1.zipf } : out
     }
 
+    /// Frequency of this exact spelling in each language (PredictionLanguage
+    /// order), whatever is enabled; zeros when it isn't in the list.
+    func zipfs(of word: String) -> [Float] {
+        guard let key = Self.key(word) else { return [0, 0, 0, 0] }
+        let k = Array(key.utf8)
+        var i = lowerBound(k)
+        while i < count, compare(i, k) == 0 {
+            let start = words + u32(wordOffsets + i * 4), end = words + u32(wordOffsets + (i + 1) * 4)
+            let w = data.withUnsafeBytes { String(decoding: $0[start..<end], as: UTF8.self) }
+            if w == word {
+                let base = data.startIndex + zipfs + i * Self.languageCount
+                return (0..<Self.languageCount).map { Float(data[base + $0]) / 10 }
+            }
+            i += 1
+        }
+        return [0, 0, 0, 0]
+    }
+
     func contains(_ key: String) -> Bool {
         let k = Array(key.utf8)
         var i = lowerBound(k)

@@ -24,7 +24,8 @@ enum Bench {
               let lexicon = Lexicon(url: plugin.appendingPathComponent("lexicon-enfrdees.bin")) else {
             return log("no keyboard bundle")
         }
-        let modelPath = plugin.appendingPathComponent("gemma-3-270m-enfrdees64k-Q4_0.gguf").path
+        // Gemma is downloaded on request now (ModelStore), not bundled.
+        guard let modelPath = ModelStore.gemmaURL()?.path else { return log("Gemma not downloaded") }
 
         // QWERTY-ish geometry like an iPhone 15 (key 38.7 x 50).
         let u: CGFloat = 38.7

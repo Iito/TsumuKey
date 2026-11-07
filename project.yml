@@ -7,11 +7,13 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: 
+    CODE_SIGN_STYLE: Automatic
     # Optimized even in Debug: the decoder's per-word loops over the 48k
     # vocabulary run ~5x slower unoptimized, which made typing feel laggy.
     SWIFT_OPTIMIZATION_LEVEL: "-O"
     MARKETING_VERSION: "0.5"
-    CURRENT_PROJECT_VERSION: "21"
+    CURRENT_PROJECT_VERSION: "27"
 packages:
   # azooKey's kana-kanji converter (MIT) with its default dictionary.
   AzooKeyKanaKanjiConverter:
@@ -56,11 +58,14 @@ targets:
     sources:
       - Keyboard
       - Shared
-      # Gemma 3 270M with its vocabulary cut to English, French, German and
-      # Spanish (Tools/prune_vocab.py), and their word list (Tools/build_lexicon.py).
-      - path: Models/gemma-3-270m-enfrdees64k-Q4_0.gguf
-        buildPhase: resources
+      # Word list for English, French, German and Spanish (Tools/build_lexicon.py).
+      # Gemma is no longer bundled: the app downloads it on request (Shared/ModelStore.swift).
       - path: Models/lexicon-enfrdees.bin
+        buildPhase: resources
+      # Small candidate rankers (Tools/rank): dense head and mixture-of-experts head.
+      - path: Models/ranker-dense.rank
+        buildPhase: resources
+      - path: Models/ranker-moe.rank
         buildPhase: resources
     entitlements:
       path: Keyboard/Keyboard.entitlements

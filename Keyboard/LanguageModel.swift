@@ -8,7 +8,7 @@ import llama
 /// reused between calls, so each keystroke only pays for the new tokens.
 /// Sequences 1...candidateSeqs score candidate words side by side, each
 /// branching off the shared context.
-final class LanguageModel {
+final class LanguageModel: WordScorer {
     static let candidateSeqs = 10
     private static let batchCapacity = 32
 

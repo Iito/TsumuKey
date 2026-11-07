@@ -47,6 +47,8 @@ struct ContentView: View {
 
                 LayoutList(settings: $settings)
 
+                ModelsSection(settings: $settings)
+
                 Section {
                     Toggle("Auto-correct", isOn: $settings.autocorrect)
                     Picker("Japanese keyboard", selection: $settings.japaneseInput) {
@@ -169,6 +171,9 @@ struct ContentView: View {
                     let picked = codes.split(separator: ",").compactMap { PredictionLanguage(rawValue: String($0)) }
                     if !picked.isEmpty { settings.predictionLanguages = picked; settings.save() }
                 }
+                // UI tests: "-model gemma|dense|moe" picks the correction model.
+                if let name = UserDefaults.standard.string(forKey: "model"),
+                   let m = CorrectionModel(rawValue: name) { settings.correctionModel = m; settings.save() }
                 Bench.runIfRequested()
                 guard ProcessInfo.processInfo.arguments.contains("-autofocus") else { return }
                 // Focusing during the first layout pass is ignored; wait a moment.

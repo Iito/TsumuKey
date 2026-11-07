@@ -13,7 +13,7 @@ settings:
     # vocabulary run ~5x slower unoptimized, which made typing feel laggy.
     SWIFT_OPTIMIZATION_LEVEL: "-O"
     MARKETING_VERSION: "0.5"
-    CURRENT_PROJECT_VERSION: "28"
+    CURRENT_PROJECT_VERSION: "29"
 packages:
   # azooKey's kana-kanji converter (MIT) with its default dictionary.
   AzooKeyKanaKanjiConverter:
@@ -76,7 +76,7 @@ targets:
       # Gemma is no longer bundled: the app downloads it on request (Shared/ModelStore.swift).
       - path: Models/lexicon-enfrdees.bin
         buildPhase: resources
-      # Small candidate rankers (Tools/rank): dense head and mixture-of-experts head.
+      # Small candidate rankers (trained in tsumukey-train): dense head and mixture-of-experts head.
       - path: Models/ranker-dense.rank
         buildPhase: resources
       - path: Models/ranker-moe.rank

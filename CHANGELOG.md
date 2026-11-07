@@ -4,6 +4,16 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 29), 2026-11-07
+Installed on the iPhone 15.
+- Small model is round 8: next-word training scores the right word against the whole
+  2,000-word shortlist, as the keyboard does, instead of 32 sampled words. Mac test set
+  (12,351 words): suggestions top-3 28.6% (round 7 26.0%, Gemma 30.2%), top-1 16.6%;
+  corrections unchanged (careful 95.5%, fast 86.7%).
+- A downloaded ranker is used only when its round is newer than the built-in one.
+- azooKey comes from a patched fork as a Swift package; llama.cpp is a submodule built by
+  Tools/build_llama_ios.sh (b12063, same as before).
+
 ## 0.5 (build 28), 2026-11-07
 Installed on the iPhone 15.
 - Models are named by architecture: "Small (Transformer 2L × 4H, 4.3M params)", read from

@@ -36,9 +36,10 @@ enum ModelStore {
         return url
     }
 
-    /// Ranker the keyboard uses: the newest downloaded round (ranker-rN.rank),
-    /// else the one built into the app.
+    /// Ranker the keyboard uses: the newest round, downloaded (ranker-rN.rank)
+    /// or built into the app. An old download must not hide a newer bundled one.
     static func rankerURL() -> (url: URL, round: Int?)? {
+        var downloaded: (URL, Int)?
         if let dir = directory,
            let files = try? FileManager.default.contentsOfDirectory(atPath: dir.path) {
             let rounds = files.compactMap { f -> (Int, String)? in
@@ -47,13 +48,14 @@ enum ModelStore {
                 return (n, f)
             }
             if let best = rounds.max(by: { $0.0 < $1.0 }) {
-                return (dir.appendingPathComponent(best.1), best.0)
+                downloaded = (dir.appendingPathComponent(best.1), best.0)
             }
         }
+        if let d = downloaded, d.1 > bundledRankerRound { return d }
         // The keyboard finds it in its own bundle, the app inside the plug-in.
         let bundled = Bundle.main.url(forResource: "ranker-dense", withExtension: "rank")
             ?? Bundle.main.builtInPlugInsURL?.appendingPathComponent("Keyboard.appex/ranker-dense.rank")
-        return bundled.map { ($0, bundledRankerRound) }
+        return bundled.map { ($0, bundledRankerRound) } ?? downloaded
     }
 
     /// Shape of a .rank file, read from its header (export.py, TKR3).
@@ -88,7 +90,7 @@ enum ModelStore {
     }
 
     /// Training round of Models/ranker-dense.rank (update with the file).
-    static let bundledRankerRound = 7
+    static let bundledRankerRound = 8
 
     /// Gemma is download-only (not bundled: it would add 100 MB to the app).
     static let gemmaFile = "gemma-3-270m-enfrdees64k-Q4_0.gguf"

@@ -1,10 +1,10 @@
 import Foundation
 
-/// Small candidate ranker (Tools/rank/train.py) that replaces Gemma for
+/// Small candidate ranker (tsumukey-train, train.py) that replaces Gemma for
 /// correction: a few MB instead of ~100. It scores how well a word fits after
 /// the context, on the same scale the decoder adds to the tap fit.
 ///
-/// Words are hashed character n-grams (Tools/rank/common.py, must match), so
+/// Words are hashed character n-grams (tsumukey-train common.py, must match), so
 /// there's no vocabulary. Context: a 2-layer transformer over the last 8
 /// tokens. Head: one of several small expert MLPs, picked per context by a
 /// router (mixture of experts, top-1), or a single dense one.
@@ -274,7 +274,7 @@ final class Ranker: WordScorer {
         return v.indices.map { (v[$0] - mean) * r * w[$0] + b[$0] }
     }
 
-    // MARK: Hashing (Tools/rank/common.py)
+    // MARK: Hashing (tsumukey-train common.py)
 
     static func fnv1a(_ s: String) -> UInt32 {
         var h: UInt32 = 0x811C9DC5

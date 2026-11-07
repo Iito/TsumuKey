@@ -158,33 +158,12 @@ final class Ranker: WordScorer {
     /// models were not, and give poor suggestions).
     func predict(count: Int, leadingSpace: Bool) -> [String] {
         guard let lexicon else { return [] }
-        // One language alone: the model was trained with two enabled, and the
-        // one-language list holds ~800 words it never saw as candidates, which
-        // get wild scores (suggestions near 0%). So run it as the pair it was
-        // trained on and keep only this language's words (back to ~28%).
-        let alone = languages.count == 1 ? languages[0] : nil
-        let savedLanguages = languages, savedMask = lexicon.languages
-        let context = lastContext  // changing languages drops it; the context vector depends on them
-        if let l = alone, let p = Self.partner[l] {
-            languages = [l, p]
-            lexicon.languages = l.bit | p.bit
-            if let context { _ = setContext(context) }
-        }
-        defer {
-            if alone != nil {
-                languages = savedLanguages; lexicon.languages = savedMask
-                if let context { _ = setContext(context) }
-            }
-        }
         let mask = lexicon.languages
-        if shortlistMask != mask || shortlistAlone != alone {
-            var words = lexicon.completions("", limit: Self.shortlistSize).map(\.word)
-            if let l = alone, let i = PredictionLanguage.allCases.firstIndex(of: l) {
-                words = words.filter { lexicon.zipfs(of: $0)[i] > 0 }
-            }
-            shortlist = words
+        // Round 10 on is trained with one or two languages enabled, so the list
+        // is simply the most frequent words of whatever is on.
+        if shortlistMask != mask {
+            shortlist = lexicon.completions("", limit: Self.shortlistSize).map(\.word)
             shortlistMask = mask
-            shortlistAlone = alone
         }
         let saved = typed
         typed = nil  // nothing typed yet
@@ -194,12 +173,6 @@ final class Ranker: WordScorer {
         typed = saved
         return s.indices.sorted { s[$0] > s[$1] }.prefix(count).map { shortlist[$0] }
     }
-
-    /// Second language to pair a lone one with (the pairing that scored best
-    /// on validation: wsp.py, round 9).
-    private static let partner: [PredictionLanguage: PredictionLanguage] =
-        [.english: .french, .french: .english, .german: .french, .spanish: .english]
-    private var shortlistAlone: PredictionLanguage?
 
     /// Words considered for suggestions (prep.py SHORTLIST, must match).
     static let shortlistSize = 2000

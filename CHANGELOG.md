@@ -4,6 +4,16 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 41), 2026-11-07
+Installed on the iPhone 15.
+- Small model is v10 (round 10): round 9's setup plus 30% of next-word examples with only one
+  language enabled. Same architecture (2L × 4H, 4.29M params). Mac test set (12,351 words):
+  corrections careful 95.7%, fast 87.2%; suggestions top-3 29.4% with two languages. With one
+  language it works on its own: English 35.4% (Gemma 37.5% with two), French 32.1%,
+  German 27.0%, Spanish 26.4%, better than build 31's workaround (31.2 / 30.7 / 25.5 / 26.1).
+- Build 31's one-language workaround is removed from Ranker.predict: every model the keyboard
+  can use is now v10 or newer (a download is only used when newer than the built-in one).
+
 ## 0.5 (build 40), 2026-11-07
 Installed on the iPhone 15.
 - The hide-keyboard button moves to the far right of the suggestion bar (the left is the

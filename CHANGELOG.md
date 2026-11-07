@@ -4,6 +4,14 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 30), 2026-11-07
+Installed on the iPhone 15.
+- Small model is round 9: round 8's setup trained twice as long (6 epochs). Same
+  architecture (2L × 4H, 4.29M params), same speed. Mac test set (12,351 words):
+  corrections careful 95.7%, fast 87.1% (round 8 95.5 / 86.7); suggestions top-3 29.3%,
+  top-1 17.5% (round 8 28.6 / 16.6, Gemma 30.2 / 18.2). A wider, 3-layer variant
+  (6.56M params) was no better.
+
 ## 0.5 (build 29), 2026-11-07
 Installed on the iPhone 15.
 - Small model is round 8: next-word training scores the right word against the whole

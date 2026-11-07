@@ -90,7 +90,7 @@ enum ModelStore {
     }
 
     /// Training round of Models/ranker-dense.rank (update with the file).
-    static let bundledRankerRound = 8
+    static let bundledRankerRound = 9
 
     /// Gemma is download-only (not bundled: it would add 100 MB to the app).
     static let gemmaFile = "gemma-3-270m-enfrdees64k-Q4_0.gguf"

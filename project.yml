@@ -13,7 +13,7 @@ settings:
     # vocabulary run ~5x slower unoptimized, which made typing feel laggy.
     SWIFT_OPTIMIZATION_LEVEL: "-O"
     MARKETING_VERSION: "0.5"
-    CURRENT_PROJECT_VERSION: "29"
+    CURRENT_PROJECT_VERSION: "30"
 packages:
   # azooKey's kana-kanji converter (MIT) with its default dictionary.
   AzooKeyKanaKanjiConverter:

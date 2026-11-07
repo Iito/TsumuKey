@@ -180,6 +180,8 @@ final class KeyboardState: ObservableObject {
     @Published var popup: Popup?
     @Published var flickGuide: FlickGuide?
     @Published var suggestions: [String] = []
+    /// The app's own test field has focus: show a hide-keyboard button.
+    @Published var inAppField = false
     /// Shown in the empty suggestion bar when Full Access is off (settings unreachable).
     @Published var setupNote: String?
     @Published var canPaste = false

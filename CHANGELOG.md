@@ -4,6 +4,33 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 40), 2026-11-07
+Installed on the iPhone 15.
+- The hide-keyboard button moves to the far right of the suggestion bar (the left is the
+  paste button's place), and a "Hide-keyboard button" setting (off by default) shows it in
+  every app. It still always shows in the app's own test field.
+
+## 0.5 (build 39), 2026-11-07
+Installed on the iPhone 15.
+- Hide-keyboard button at the left of the suggestion bar, only while typing in the app's own
+  "Try it here" field. iOS doesn't tell a keyboard which app it's in, so the app sets a flag
+  in the App Group (plus a Darwin notification) while its field is focused, and clears it when
+  the field loses focus or the app leaves the foreground.
+
+## 0.5 (build 38), 2026-11-07
+Installed on the iPhone 15.
+- Build 37's fix broke scrolling with the field focused (stuck under the keyboard); reverted.
+  Instead the "Try it here" field is pinned above the settings list instead of inside it, so
+  a keyboard resize has no focused field in the list to scroll back to. Normal keyboard
+  avoidance is back. The key height slider still applies on release.
+
+## 0.5 (build 37), 2026-11-07
+Installed on the iPhone 15.
+- Changing key height or the number row with the keyboard open no longer scrolls the app
+  back to the "Try it here" field: the settings list ignores keyboard avoidance (which
+  re-scrolled to the focused field on every keyboard resize) and keeps room for the
+  keyboard itself. The key height slider applies when released, not on every step.
+
 ## 0.5 (build 36), 2026-11-07
 Installed on the iPhone 15.
 - Settings apply to an open keyboard right away (for example in the app's "Try it here"

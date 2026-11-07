@@ -21,6 +21,17 @@ enum SharedSettings {
     /// open keyboard rereads them without being closed and reopened.
     static let changed = "com.tsumukey.settingsChanged" as CFString
 
+    /// Set by the app while its own "Try it here" field is focused: the keyboard
+    /// then offers a hide button (it can't tell which app it's typing in).
+    static let inAppField = "com.tsumukey.inAppField" as CFString
+    static let inAppFieldKey = "inAppFieldFocused"
+
+    static func setInAppField(_ focused: Bool) {
+        defaults.set(focused, forKey: inAppFieldKey)
+        CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+                                             CFNotificationName(inAppField), nil, nil, true)
+    }
+
     static func save<T: Encodable>(_ value: T, key: String, notify: Bool = true) {
         guard let data = try? JSONEncoder().encode(value) else { return }
         defaults.set(data, forKey: key)
@@ -66,6 +77,9 @@ struct KeyboardSettings: Codable, Equatable {
     var numberRow = true
     /// Small symbol in each key's corner. Long-press works either way.
     var showSymbolHints = true
+    /// Hide-keyboard button at the right end of the suggestion bar, in every app
+    /// (it always shows in the app's own test field).
+    var hideKeyboardButton = false
     /// The currency on the D-position key's corner.
     var currency = "$"
     /// Height of one key row in points (the system keyboard is about 44–46).
@@ -102,6 +116,7 @@ struct KeyboardSettings: Codable, Equatable {
         layout = try c.decodeIfPresent(LetterLayout.self, forKey: .layout) ?? d.layout
         numberRow = try c.decodeIfPresent(Bool.self, forKey: .numberRow) ?? d.numberRow
         showSymbolHints = try c.decodeIfPresent(Bool.self, forKey: .showSymbolHints) ?? d.showSymbolHints
+        hideKeyboardButton = try c.decodeIfPresent(Bool.self, forKey: .hideKeyboardButton) ?? d.hideKeyboardButton
         currency = try c.decodeIfPresent(String.self, forKey: .currency) ?? d.currency
         rowHeight = try c.decodeIfPresent(Double.self, forKey: .rowHeight) ?? d.rowHeight
         autocorrect = try c.decodeIfPresent(Bool.self, forKey: .autocorrect) ?? d.autocorrect

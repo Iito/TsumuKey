@@ -18,16 +18,6 @@ struct ContentView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Try it here") {
-                    // Lets the typing benchmark (UI test) reset the field between
-                    // sentences. Above the field, so a long text can't push it off screen.
-                    Button("Clear") { text = "" }
-                        .accessibilityIdentifier("clearField")
-                    TextField("Type something…", text: $text, axis: .vertical)
-                        .lineLimit(4...10)
-                        .focused($fieldFocused)
-                        .accessibilityIdentifier("testField")
-                }
 
                 if report?.fullAccess != true {
                     Section {
@@ -94,14 +84,8 @@ struct ContentView: View {
                         ForEach(NumberKeyTap.allCases) { Text($0.name).tag($0) }
                     }
                     Toggle("Show symbols on keys", isOn: $settings.showSymbolHints)
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Key height")
-                            Spacer()
-                            Text("\(Int(settings.rowHeight)) pt").monospacedDigit().foregroundStyle(.secondary)
-                        }
-                        Slider(value: $settings.rowHeight, in: KeyboardSettings.rowHeightRange, step: 1)
-                    }
+                    Toggle("Hide-keyboard button", isOn: $settings.hideKeyboardButton)
+                    RowHeightSlider(rowHeight: $settings.rowHeight)
                     Picker("Quick currency", selection: $settings.currency) {
                         ForEach(KeyboardSettings.currencies, id: \.self) { Text($0).tag($0) }
                     }
@@ -165,16 +149,23 @@ struct ContentView: View {
                 } header: {
                     Text("Delete key")
                 } footer: {
-                    Text("Tap: one character. Hold: characters, repeating. Tap then hold: one word. Double tap then hold: word after word. Lower numbers are faster. Changes apply the next time the keyboard opens.")
+                    Text("Tap: one character. Hold: characters, repeating. Tap then hold: one word. Double tap then hold: word after word. Lower numbers are faster.")
                 }
 
             }
             .navigationTitle("TsumuKey")
+            // The test field is pinned above the list, not inside it: iOS scrolls a
+            // list back to its focused field whenever the keyboard changes height
+            // (key height, number row), which jumped away from the setting being changed.
+            .safeAreaInset(edge: .top, spacing: 0) { tryItHere }
             .onChange(of: timing) { _, new in new.save() }
             .onChange(of: settings) { _, new in new.save() }
             // The keyboard can change the layout too (long-press its settings key), so
             // re-read whenever the app comes back to the front.
+            .onChange(of: fieldFocused) { _, focused in SharedSettings.setInAppField(focused) }
             .onChange(of: scenePhase) { _, phase in
+                // Leaving the app: the keyboard must not offer "hide" elsewhere.
+                SharedSettings.setInAppField(phase == .active && fieldFocused)
                 guard phase == .active else { return }
                 let latest = KeyboardSettings.load()
                 if latest != settings { settings = latest }
@@ -326,6 +317,51 @@ private struct ColorRow: View {
         ColorPicker(title, selection: Binding(
             get: { Color(UIColor(hex: hex) ?? .label) },
             set: { hex = UIColor($0).hex }), supportsOpacity: false)
+    }
+}
+
+extension ContentView {
+    private var tryItHere: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Try it here").font(.footnote).foregroundStyle(.secondary).textCase(.uppercase)
+                Spacer()
+                // Lets the typing benchmark (UI test) reset the field between sentences.
+                Button("Clear") { text = "" }
+                    .font(.callout)
+                    .accessibilityIdentifier("clearField")
+            }
+            TextField("Type something…", text: $text, axis: .vertical)
+                .lineLimit(2...4)
+                .focused($fieldFocused)
+                .accessibilityIdentifier("testField")
+                .padding(10)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 10))
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color(.systemGroupedBackground))
+    }
+}
+
+/// Key height applies when the slider is let go, not on every step: each
+/// change resizes an open keyboard.
+private struct RowHeightSlider: View {
+    @Binding var rowHeight: Double
+    @State private var draft: Double?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text("Key height")
+                Spacer()
+                Text("\(Int(draft ?? rowHeight)) pt").monospacedDigit().foregroundStyle(.secondary)
+            }
+            Slider(value: Binding(get: { draft ?? rowHeight }, set: { draft = $0 }),
+                   in: KeyboardSettings.rowHeightRange, step: 1) { editing in
+                if !editing, let d = draft { rowHeight = d; draft = nil }
+            }
+        }
     }
 }
 

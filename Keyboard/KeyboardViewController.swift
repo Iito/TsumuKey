@@ -78,6 +78,7 @@ final class KeyboardViewController: UIInputViewController {
         TouchLog.reset()
         // Pick up any changes made in the app since the keyboard last opened.
         applySettings()
+        state.inAppField = SharedSettings.defaults.bool(forKey: SharedSettings.inAppFieldKey)
         state.setupNote = hasFullAccess ? nil : "Turn on Full Access in Settings to use your TsumuKey settings"
         KeyboardReport(build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?",
                        openedAt: Date(), fullAccess: hasFullAccess,
@@ -112,6 +113,13 @@ final class KeyboardViewController: UIInputViewController {
                 vc.state.textChanged()
             }
         }, SharedSettings.changed, nil, .deliverImmediately)
+        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), me, { _, observer, _, _, _ in
+            guard let observer else { return }
+            let vc = Unmanaged<KeyboardViewController>.fromOpaque(observer).takeUnretainedValue()
+            DispatchQueue.main.async {
+                vc.state.inAppField = SharedSettings.defaults.bool(forKey: SharedSettings.inAppFieldKey)
+            }
+        }, SharedSettings.inAppField, nil, .deliverImmediately)
     }
 
     deinit {

@@ -650,6 +650,21 @@ private struct SuggestionBar: View {
                 }
                 .buttonStyle(.plain)
             }
+            if state.inAppField || state.settings.hideKeyboardButton {
+                Divider().frame(height: 22)
+                Button {
+                    state.keyDown()
+                    state.controller?.dismissKeyboard()
+                } label: {
+                    Image(systemName: "keyboard.chevron.compact.down")
+                        .font(.system(size: 17))
+                        .frame(width: 44)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Hide keyboard")
+            }
         }
         .padding(.horizontal, 6)
     }

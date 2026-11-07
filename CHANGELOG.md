@@ -1,8 +1,57 @@
 # TsumuKey changelog (BetterKeys until 0.5)
 
 Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`).
-Bump the build number for every build installed on a phone and add an entry here.
-The app shows its version at the bottom of the "Set up" section (from build 2 on).
+The app shows its version at the bottom of its settings (from build 44; before, under "Set up").
+
+Rules (from 0.6.0):
+- Build number: +1 for every build installed on a phone, with an entry here. Never reset.
+- Version, major.minor.patch:
+  - major: first public release (1.0.0), later a big change in how the app works;
+  - minor: a new feature worth telling a user about (setting, screen, model type);
+  - patch: fixes and polish, nothing new to learn.
+- Model updates shipped through Hugging Face don't change the app version; the small model
+  has its own version (v10 = training round 10).
+- Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
+
+## 0.6.0 (build 46), 2026-11-07
+Installed on the iPhone 15. Same app as build 45; the version is written 0.6.0 under the
+rules above.
+
+
+## 0.6 (build 45), 2026-11-07
+Installed on the iPhone 15 (build 44 had a "Replace which?" swap, dropped). New version for what changed since 0.5 (build 21):
+- Corrections and suggestions come from the small model (now v10, 2L × 4H, 4.3M params),
+  built in, about 10× faster than Gemma and better at corrections. Gemma 3 is an optional
+  download.
+- Models download from Hugging Face on request, with versions, updates, cancel, and a
+  question before using mobile data. The keyboard never goes online.
+- One prediction language works as well as two.
+- Settings apply to an open keyboard right away; the app shows a Full Access card until the
+  keyboard confirms it's on (iOS can't ask for it).
+- "Try it here" is pinned above the settings; optional hide-keyboard button; keys reach the
+  screen edge like Gboard.
+- The version moved to the bottom of the settings, as a footer.
+- Layouts and Prediction Languages are one page each, no Edit mode: in use on top (swipe left
+  to remove, right to make default / move to top), the rest below (tap to add; greyed out
+  when the list is full).
+- Removed the keyboard's debug line under "Set up" (build, Full Access, settings, layout); the
+  report behind it still drives the Full Access card.
+
+## 0.5 (build 43), 2026-11-07
+Installed on the iPhone 15.
+- Build 42's mobile-data question never showed. Likely causes, both changed: the alert hung off
+  the list Section (now off the "Check for models" row), and it relied on NWPathMonitor's
+  isExpensive arriving through a published flag (now the current path is read at the tap:
+  not Wi-Fi or Ethernet = ask).
+- A download in progress can be cancelled (✕ next to its progress bar); nothing is kept.
+
+## 0.5 (build 42), 2026-11-07
+Installed on the iPhone 15 (superseded by 43: the question didn't show).
+- Model downloads work on mobile data again, but ask first: on an expensive network (mobile
+  data or a hotspot, NWPathMonitor) Download/Update shows "Download on mobile data?" with the
+  size. iOS lists Mobile Data for any app that has used the network, so Wi-Fi-only (build 35)
+  didn't remove the switch, it just blocked downloads. If Mobile Data is off for the app, the
+  error says where to turn it on. Checking the model list (a few hundred bytes) doesn't ask.
 
 ## 0.5 (build 41), 2026-11-07
 Installed on the iPhone 15.

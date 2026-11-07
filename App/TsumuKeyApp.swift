@@ -47,21 +47,9 @@ struct ContentView: View {
                     }
                 } header: {
                     Text("Set up")
-                } footer: {
-                    // Matches the entries in CHANGELOG.md.
-                    let info = Bundle.main.infoDictionary
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Version \(info?["CFBundleShortVersionString"] as? String ?? "?") (build \(info?["CFBundleVersion"] as? String ?? "?"))")
-                        if let r = report {
-                            Text("Keyboard: build \(r.build), opened \(r.openedAt.formatted(date: .omitted, time: .shortened)), " +
-                                 "Full Access \(r.fullAccess ? "on" : "off"), settings \(r.settingsFound ? "found" : "not found"), layout \(r.layout)")
-                        } else {
-                            Text("Keyboard: no report yet. Open the keyboard once; if this stays, it can't reach the app's settings (Full Access off?).")
-                        }
-                    }
                 }
                 .font(.callout)
-                // The keyboard reports each time it opens, also from the field above.
+                // The keyboard reports each time it opens (drives the Full Access card).
                 .task {
                     while !Task.isCancelled {
                         report = KeyboardReport.load()
@@ -97,10 +85,10 @@ struct ContentView: View {
 
                 Section {
                     NavigationLink {
-                        OrderedListPage(title: "Prediction Languages", addTitle: "Add New Language",
+                        OrderedListPage(title: "Prediction Languages",
                                         items: $settings.predictionLanguages, all: PredictionLanguage.allCases,
                                         name: \.name, limit: KeyboardSettings.maxPredictionLanguages,
-                                        firstNote: nil,
+                                        firstNote: nil, topAction: "Move to Top",
                                         footer: "Up to \(KeyboardSettings.maxPredictionLanguages). Suggestions and autocorrect mix them; more would make autocorrect swap right words for look-alikes in another language.")
                     } label: {
                         LabeledContent("Prediction Languages",
@@ -152,6 +140,12 @@ struct ContentView: View {
                     Text("Tap: one character. Hold: characters, repeating. Tap then hold: one word. Double tap then hold: word after word. Lower numbers are faster.")
                 }
 
+                // Version at the very bottom; matches the entries in CHANGELOG.md.
+                Section {} footer: {
+                    let info = Bundle.main.infoDictionary
+                    Text("TsumuKey \(info?["CFBundleShortVersionString"] as? String ?? "?") (build \(info?["CFBundleVersion"] as? String ?? "?"))")
+                        .frame(maxWidth: .infinity)
+                }
             }
             .navigationTitle("TsumuKey")
             // The test field is pinned above the list, not inside it: iOS scrolls a
@@ -217,9 +211,10 @@ private struct LayoutList: View {
     var body: some View {
         Section {
             NavigationLink {
-                OrderedListPage(title: "Layouts", addTitle: "Add New Layout",
+                OrderedListPage(title: "Layouts",
                                 items: $settings.menuLayouts, all: LetterLayout.allCases,
                                 name: \.name, limit: KeyboardSettings.maxMenuLayouts, firstNote: "Default",
+                                topAction: "Make Default",
                                 footer: "Up to \(KeyboardSettings.maxMenuLayouts). The first one is the default.")
                     .onChange(of: settings.menuLayouts) { _, list in
                         // The keyboard opens on the top layout.
@@ -234,20 +229,21 @@ private struct LayoutList: View {
     }
 }
 
-/// An ordered pick list like iOS's Settings → Keyboards → Keyboards: Edit
-/// shows delete buttons and drag handles (only then can rows move or go),
-/// "Add New…" picks from the rest. At least 1 item, at most `limit`.
+/// One page for an ordered pick list: what's in use on top (first = default),
+/// everything else below. Tap to add (greyed out when full). Swipe left to
+/// remove, right to move to the top. At least 1 item, at most `limit`.
 private struct OrderedListPage<Item: Identifiable & Hashable>: View {
     let title: String
-    let addTitle: String
     @Binding var items: [Item]
     let all: [Item]
     let name: KeyPath<Item, String>
     let limit: Int
     /// Shown under the first row ("Default"), or nil.
     let firstNote: String?
+    let topAction: String
     let footer: String
-    @State private var editMode: EditMode = .inactive
+
+    private var rest: [Item] { all.filter { !items.contains($0) } }
 
     var body: some View {
         List {
@@ -259,49 +255,47 @@ private struct OrderedListPage<Item: Identifiable & Hashable>: View {
                             Text(firstNote).font(.subheadline).foregroundStyle(.secondary)
                         }
                     }
-                }
-                .onMove { items.move(fromOffsets: $0, toOffset: $1) }
-                .onDelete { rows in
-                    guard items.count > rows.count else { return }
-                    items.remove(atOffsets: rows)
-                }
-                .deleteDisabled(!editMode.isEditing || items.count <= 1)
-                .moveDisabled(!editMode.isEditing)
-            } footer: {
-                Text(footer)
-            }
-
-            if !editMode.isEditing {
-                Section {
-                    NavigationLink(addTitle) {
-                        AddItemPage(title: addTitle, items: $items, all: all, name: name, limit: limit)
+                    .swipeActions(edge: .trailing) {
+                        if items.count > 1 {
+                            Button("Remove", role: .destructive) { items.removeAll { $0 == item } }
+                        }
                     }
-                    .disabled(items.count >= limit)
+                    .swipeActions(edge: .leading) {
+                        if item != items.first {
+                            Button(topAction) {
+                                items.removeAll { $0 == item }
+                                items.insert(item, at: 0)
+                            }
+                            .tint(.blue)
+                        }
+                    }
+                }
+            } header: {
+                Text("In use")
+            } footer: {
+                Text(footer + " Swipe left to remove, right to \(topAction.lowercased()).")
+            }
+
+            if !rest.isEmpty {
+                Section {
+                    ForEach(rest) { item in
+                        Button {
+                            items.append(item)
+                        } label: {
+                            HStack {
+                                Text(item[keyPath: name])
+                                Spacer()
+                                Image(systemName: "plus.circle.fill")
+                            }
+                        }
+                        .disabled(items.count >= limit)
+                    }
+                } header: {
+                    Text("Add")
+                } footer: {
+                    if items.count >= limit { Text("Up to \(limit). Remove one to add another.") }
                 }
             }
-        }
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar { EditButton() }
-        .environment(\.editMode, $editMode)
-    }
-}
-
-private struct AddItemPage<Item: Identifiable & Hashable>: View {
-    let title: String
-    @Binding var items: [Item]
-    let all: [Item]
-    let name: KeyPath<Item, String>
-    let limit: Int
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        List(all.filter { !items.contains($0) }) { item in
-            Button(item[keyPath: name]) {
-                if items.count < limit { items.append(item) }
-                dismiss()
-            }
-            .foregroundStyle(Color.primary)
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)

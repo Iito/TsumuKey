@@ -1,4 +1,5 @@
 import CryptoKit
+import Network
 import SwiftUI
 
 /// Downloads models listed in the Hugging Face repo's models.json into the
@@ -12,18 +13,29 @@ final class ModelDownloader: ObservableObject {
     private var observations: [String: NSKeyValueObservation] = [:]
     @Published var checked = false                    // list fetched at least once this session
 
-    /// Wi-Fi only: Gemma is 100 MB, and the app should never use mobile data.
-    private let session: URLSession = {
-        let c = URLSessionConfiguration.default
-        c.allowsCellularAccess = false
-        return URLSession(configuration: c)
-    }()
+    private let session = URLSession(configuration: .default)
+    private let monitor = NWPathMonitor()
+    private var tasks: [String: URLSessionDownloadTask] = [:]
+
+    init() { monitor.start(queue: DispatchQueue(label: "net")) }
+
+    deinit { monitor.cancel() }
+
+    /// Not on Wi-Fi (or Ethernet) right now: downloads ask first.
+    var onMobileData: Bool {
+        let p = monitor.currentPath
+        return p.status == .satisfied && !p.usesInterfaceType(.wifi) && !p.usesInterfaceType(.wiredEthernet)
+    }
+
+    func cancel(_ m: ModelStore.Model) { tasks[m.id]?.cancel() }
 
     private static func describe(_ error: Error) -> String {
         let e = error as NSError
-        if e.domain == NSURLErrorDomain,
-           [NSURLErrorNotConnectedToInternet, NSURLErrorDataNotAllowed, NSURLErrorNetworkConnectionLost].contains(e.code) {
-            return "No Wi-Fi. TsumuKey downloads over Wi-Fi only; connect and try again."
+        if e.domain == NSURLErrorDomain, e.code == NSURLErrorDataNotAllowed {
+            return "Mobile data is off for TsumuKey (Settings → TsumuKey → Mobile Data). Use Wi-Fi or turn it on."
+        }
+        if e.domain == NSURLErrorDomain, [NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost].contains(e.code) {
+            return "No connection. Try again on Wi-Fi."
         }
         return e.localizedDescription
     }
@@ -79,6 +91,8 @@ final class ModelDownloader: ObservableObject {
                 } else {
                     result = "\(m.name): checksum mismatch, file discarded"
                 }
+            } else if (err as? URLError)?.code == .cancelled {
+                result = nil  // cancelled by the user; nothing was kept
             } else {
                 result = err.map(Self.describe) ?? "download failed"
             }
@@ -86,6 +100,7 @@ final class ModelDownloader: ObservableObject {
                 guard let self else { return }
                 self.progress[m.id] = nil
                 self.observations[m.id] = nil
+                self.tasks[m.id] = nil
                 self.error = result
                 self.revision += 1
             }
@@ -93,6 +108,7 @@ final class ModelDownloader: ObservableObject {
         observations[m.id] = task.progress.observe(\.fractionCompleted) { [weak self] p, _ in
             Task { @MainActor in if self?.progress[m.id] != nil { self?.progress[m.id] = p.fractionCompleted } }
         }
+        tasks[m.id] = task
         task.resume()
     }
 
@@ -114,6 +130,12 @@ final class ModelDownloader: ObservableObject {
 struct ModelsSection: View {
     @Binding var settings: KeyboardSettings
     @StateObject private var downloader = ModelDownloader()
+    @State private var confirmCellular: ModelStore.Model?
+
+    /// Downloads right away on Wi-Fi; on mobile data, asks first.
+    private func request(_ m: ModelStore.Model) {
+        if downloader.onMobileData { confirmCellular = m } else { downloader.download(m) }
+    }
 
     private var gemmaInstalled: Bool { _ = downloader.revision; return ModelStore.gemmaURL() != nil }
     private var smallLabel: String {
@@ -136,6 +158,14 @@ struct ModelsSection: View {
             Button(downloader.checked ? "Check again" : "Check for models") {
                 Task { await downloader.refresh() }
             }
+            .alert("Download on mobile data?", isPresented: Binding(get: { confirmCellular != nil },
+                                                                    set: { if !$0 { confirmCellular = nil } }),
+                   presenting: confirmCellular) { m in
+                Button("Download") { downloader.download(m) }
+                Button("Cancel", role: .cancel) {}
+            } message: { m in
+                Text("You're not on Wi-Fi. \(m.name) is \(ByteCountFormatter.string(fromByteCount: Int64(m.size), countStyle: .file)).")
+            }
             ForEach(downloader.available) { m in
                 HStack {
                     VStack(alignment: .leading) {
@@ -152,12 +182,19 @@ struct ModelsSection: View {
                     Spacer()
                     if let p = downloader.progress[m.id] {
                         ProgressView(value: p).frame(width: 80)
+                        Button {
+                            downloader.cancel(m)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Cancel download")
                     } else if downloader.isInstalled(m) {
                         Button("Delete", role: .destructive) { downloader.delete(m) }.buttonStyle(.borderless)
                     } else if downloader.replaces(m) != nil {
-                        Button("Update") { downloader.download(m) }.buttonStyle(.borderless)
+                        Button("Update") { request(m) }.buttonStyle(.borderless)
                     } else {
-                        Button("Download") { downloader.download(m) }.buttonStyle(.borderless)
+                        Button("Download") { request(m) }.buttonStyle(.borderless)
                     }
                 }
             }
@@ -169,8 +206,9 @@ struct ModelsSection: View {
             } else if settings.correctionModel == .gemma && !gemmaInstalled {
                 Text("Gemma isn't downloaded yet, so the keyboard keeps using the small model.")
             } else {
-                Text("The app goes online only when you tap Check or Download, to fetch models from huggingface.co/iito-sama/tsumukey-models, over Wi-Fi only. The keyboard never connects, and nothing you type leaves your phone. A new model is used the next time the keyboard opens.")
+                Text("The app goes online only when you tap Check or Download, to fetch models from huggingface.co/iito-sama/tsumukey-models; on mobile data it asks before downloading. The keyboard never connects, and nothing you type leaves your phone. A new model is used the next time the keyboard opens.")
             }
         }
+
     }
 }

@@ -104,7 +104,9 @@ struct KeyboardView: View {
         case .symbols2: base = Layouts.symbols(state.settings, page: 2, showGlobe: state.showGlobe)
         default: base = Layouts.numpad
         }
-        let unit = (width - 6) / 10
+        // Keys run to the screen edge; each key's own 3 pt padding is the
+        // margin (like Gboard), so edge keys get the full cell to tap.
+        let unit = width / 10
         let rowHeight = height / CGFloat(base.count)
         let rows = Self.placeLetters(base, numberRow: state.settings.numberRow,
                                      latin: state.mode == .letters || state.mode == .romaji)
@@ -133,7 +135,6 @@ struct KeyboardView: View {
                 }
             }
         }
-        .padding(.horizontal, 3)
         .coordinateSpace(name: "rows")
         // Touches for the whole grid go through one view (see TouchLayer).
         .overlayPreferenceValue(KeyGeometryPreference.self) { keys in
@@ -626,6 +627,13 @@ private struct SuggestionBar: View {
                 }
                 .buttonStyle(.plain)
                 if !state.suggestions.isEmpty { Divider().frame(height: 22) }
+            }
+            if entries.isEmpty, let note = state.setupNote {
+                Text(note)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity)
             }
             ForEach(Array(entries.enumerated()), id: \.offset) { index, item in
                 if index > 0 { Divider().frame(height: 22) }

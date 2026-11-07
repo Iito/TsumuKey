@@ -4,6 +4,26 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 35), 2026-11-07
+Installed on the iPhone 15.
+- Cause of build 33's "settings don't work": Full Access was off. The removed named pasteboard
+  had been carrying settings without it. iOS has no API to request Full Access, so:
+  - the app shows a "Turn on Full Access" card with Open Settings until the keyboard reports
+    it on (the keyboard's report from build 34);
+  - the keyboard's empty suggestion bar says "Turn on Full Access in Settings to use your
+    TsumuKey settings" when it's off.
+- Network: the app no longer fetches the model list on launch, only on "Check for models";
+  the list and downloads use Wi-Fi only (allowsCellularAccess off). The Models footer says
+  what goes online and that the keyboard never connects.
+
+## 0.5 (build 34), 2026-11-07
+Installed on the iPhone 15.
+- Settings reported not reaching the keyboard after build 33. The keyboard now writes what it
+  saw (build, time, Full Access, settings found, layout) into the App Group each time it
+  opens, and the app shows it under "Set up".
+- Letter keys run to the screen edge: the row's extra 3 pt margin is gone, so a key face
+  starts 3 pt from the edge (Gboard: ~3 pt; it was 6 pt). Gaps between keys unchanged (6 pt).
+
 ## 0.5 (build 33), 2026-11-07
 Installed on the iPhone 15.
 - Settings reach the keyboard through the App Group only. The named pasteboard

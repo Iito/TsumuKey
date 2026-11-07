@@ -78,6 +78,11 @@ final class KeyboardViewController: UIInputViewController {
         // Pick up any changes made in the app since the keyboard last opened.
         let settings = KeyboardSettings.load()
         if settings != state.settings { state.settings = settings }
+        state.setupNote = hasFullAccess ? nil : "Turn on Full Access in Settings to use your TsumuKey settings"
+        KeyboardReport(build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?",
+                       openedAt: Date(), fullAccess: hasFullAccess,
+                       settingsFound: SharedSettings.defaults.data(forKey: "keyboardSettings") != nil,
+                       layout: settings.layout.rawValue).save()
         heightConstraint?.constant = Metrics.totalHeight(settings)
         // Day/night: the key colours are dynamic, so overriding the style
         // repaints the whole keyboard, background included.

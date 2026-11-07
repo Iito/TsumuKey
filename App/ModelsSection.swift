@@ -10,6 +10,23 @@ final class ModelDownloader: ObservableObject {
     @Published var error: String?
     @Published var revision = 0                       // bumps when files change on disk
     private var observations: [String: NSKeyValueObservation] = [:]
+    @Published var checked = false                    // list fetched at least once this session
+
+    /// Wi-Fi only: Gemma is 100 MB, and the app should never use mobile data.
+    private let session: URLSession = {
+        let c = URLSessionConfiguration.default
+        c.allowsCellularAccess = false
+        return URLSession(configuration: c)
+    }()
+
+    private static func describe(_ error: Error) -> String {
+        let e = error as NSError
+        if e.domain == NSURLErrorDomain,
+           [NSURLErrorNotConnectedToInternet, NSURLErrorDataNotAllowed, NSURLErrorNetworkConnectionLost].contains(e.code) {
+            return "No Wi-Fi. TsumuKey downloads over Wi-Fi only; connect and try again."
+        }
+        return e.localizedDescription
+    }
 
     private var build: Int {
         Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0
@@ -17,13 +34,14 @@ final class ModelDownloader: ObservableObject {
 
     func refresh() async {
         do {
-            let (data, _) = try await URLSession.shared.data(from: ModelStore.manifestURL)
+            let (data, _) = try await session.data(from: ModelStore.manifestURL)
             let manifest = try JSONDecoder().decode(ModelStore.Manifest.self, from: data)
             available = manifest.models.filter { $0.minBuild <= build }
             error = nil
         } catch {
-            self.error = "Couldn't load the model list: \(error.localizedDescription)"
+            self.error = "Couldn't load the model list. " + Self.describe(error)
         }
+        checked = true
     }
 
     func isInstalled(_ m: ModelStore.Model) -> Bool { _ = revision; return ModelStore.localURL(m.file) != nil }
@@ -42,7 +60,7 @@ final class ModelDownloader: ObservableObject {
             return
         }
         progress[m.id] = 0
-        let task = URLSession.shared.downloadTask(with: m.url) { [weak self] tmp, _, err in
+        let task = session.downloadTask(with: m.url) { [weak self] tmp, _, err in
             // Verify and move here: the temporary file is gone once this returns.
             var result: String?
             if let tmp {
@@ -62,7 +80,7 @@ final class ModelDownloader: ObservableObject {
                     result = "\(m.name): checksum mismatch, file discarded"
                 }
             } else {
-                result = err?.localizedDescription ?? "download failed"
+                result = err.map(Self.describe) ?? "download failed"
             }
             Task { @MainActor in
                 guard let self else { return }
@@ -115,6 +133,9 @@ struct ModelsSection: View {
                     Text(settings.correctionModel.name).tag(settings.correctionModel)  // set by the bench
                 }
             }
+            Button(downloader.checked ? "Check again" : "Check for models") {
+                Task { await downloader.refresh() }
+            }
             ForEach(downloader.available) { m in
                 HStack {
                     VStack(alignment: .leading) {
@@ -148,9 +169,8 @@ struct ModelsSection: View {
             } else if settings.correctionModel == .gemma && !gemmaInstalled {
                 Text("Gemma isn't downloaded yet, so the keyboard keeps using the small model.")
             } else {
-                Text("Models download from huggingface.co/iito-sama/tsumukey-models. The keyboard switches the next time it opens.")
+                Text("The app goes online only when you tap Check or Download, to fetch models from huggingface.co/iito-sama/tsumukey-models, over Wi-Fi only. The keyboard never connects, and nothing you type leaves your phone. A new model is used the next time the keyboard opens.")
             }
         }
-        .task { await downloader.refresh() }
     }
 }

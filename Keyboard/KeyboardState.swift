@@ -180,6 +180,8 @@ final class KeyboardState: ObservableObject {
     @Published var popup: Popup?
     @Published var flickGuide: FlickGuide?
     @Published var suggestions: [String] = []
+    /// Shown in the empty suggestion bar when Full Access is off (settings unreachable).
+    @Published var setupNote: String?
     @Published var canPaste = false
     /// Keys currently under a finger, for the pressed highlight.
     @Published var pressedKeys: Set<String> = []

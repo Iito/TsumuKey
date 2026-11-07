@@ -12,6 +12,7 @@ struct ContentView: View {
     @State private var text = ""
     @State private var timing = DeleteTiming.load()
     @State private var settings = KeyboardSettings.load()
+    @State private var report = KeyboardReport.load()
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
@@ -28,9 +29,27 @@ struct ContentView: View {
                         .accessibilityIdentifier("testField")
                 }
 
+                if report?.fullAccess != true {
+                    Section {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(report == nil ? "Turn on Full Access" : "Full Access is off")
+                                .font(.headline)
+                            Text(report == nil
+                                 ? "Add the TsumuKey keyboard, turn on Allow Full Access, then open the keyboard once (in the field above). Until then it uses default settings."
+                                 : "The keyboard can't read your settings or downloaded models. Settings → General → Keyboard → Keyboards → TsumuKey → Allow Full Access.")
+                                .font(.callout)
+                            Text("iOS doesn't let apps ask for this; it's only switched on in Settings. TsumuKey uses it to share settings and models with the keyboard. The keyboard never goes online.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
+                        Button("Open Settings") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                        }
+                    }
+                }
+
                 Section {
                     Text("1. Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey")
-                    Text("2. Tap TsumuKey in that list and turn on **Allow Full Access**, so the keyboard can read the settings below.")
+                    Text("2. Tap TsumuKey in that list and turn on **Allow Full Access**, so the keyboard can read the settings below. iOS shows a warning for every keyboard with Full Access; TsumuKey's keyboard has no network access and nothing you type leaves your phone.")
                     Button("Open Settings") {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
@@ -41,9 +60,24 @@ struct ContentView: View {
                 } footer: {
                     // Matches the entries in CHANGELOG.md.
                     let info = Bundle.main.infoDictionary
-                    Text("Version \(info?["CFBundleShortVersionString"] as? String ?? "?") (build \(info?["CFBundleVersion"] as? String ?? "?"))")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Version \(info?["CFBundleShortVersionString"] as? String ?? "?") (build \(info?["CFBundleVersion"] as? String ?? "?"))")
+                        if let r = report {
+                            Text("Keyboard: build \(r.build), opened \(r.openedAt.formatted(date: .omitted, time: .shortened)), " +
+                                 "Full Access \(r.fullAccess ? "on" : "off"), settings \(r.settingsFound ? "found" : "not found"), layout \(r.layout)")
+                        } else {
+                            Text("Keyboard: no report yet. Open the keyboard once; if this stays, it can't reach the app's settings (Full Access off?).")
+                        }
+                    }
                 }
                 .font(.callout)
+                // The keyboard reports each time it opens, also from the field above.
+                .task {
+                    while !Task.isCancelled {
+                        report = KeyboardReport.load()
+                        try? await Task.sleep(for: .seconds(2))
+                    }
+                }
 
                 LayoutList(settings: $settings)
 

@@ -23,6 +23,20 @@ enum SharedSettings {
     }
 }
 
+/// What the keyboard saw the last time it opened, written by the keyboard
+/// into the App Group so the app can show whether settings reach it. Without
+/// Full Access the write never reaches the app, which then shows no report.
+struct KeyboardReport: Codable, Equatable {
+    var build: String
+    var openedAt: Date
+    var fullAccess: Bool
+    var settingsFound: Bool
+    var layout: String
+    private static let key = "keyboardReport"
+    static func load() -> KeyboardReport? { SharedSettings.load(Self.self, key: key) }
+    func save() { SharedSettings.save(self, key: Self.key) }
+}
+
 enum LetterLayout: String, Codable, CaseIterable, Identifiable {
     case qwerty, colemak, azerty, qwertz, dvorak
 

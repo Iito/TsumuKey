@@ -1,0 +1,4 @@
+[submodule "Vendor/llama.cpp"]
+	path = Vendor/llama.cpp
+	url = https://github.com/ggml-org/llama.cpp
+	shallow = true

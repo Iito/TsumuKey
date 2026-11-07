@@ -97,9 +97,11 @@ sentences, at twice the size, so the keyboard stays on Gemma.
 ## Building
 
 Requirements: macOS with Xcode 16, [XcodeGen](https://github.com/yonaskolb/XcodeGen),
-an Apple developer team for signing.
+cmake and ninja (`brew install xcodegen cmake ninja`), an Apple developer team
+for signing.
 
 ```sh
+Tools/build_llama_ios.sh          # once: builds llama.cpp from the Vendor/llama.cpp submodule
 xcodegen generate                 # creates TsumuKey.xcodeproj from project.yml
 open TsumuKey.xcodeproj           # set your team, then build and run on an iPhone
 ```
@@ -118,8 +120,9 @@ app, from [Hugging Face](https://huggingface.co/iito-sama/tsumukey-models).
 The scripts that build them and train the small model live in a separate
 repository, tsumukey-train.
 
-`Tools/build_llama_ios.sh` builds llama.cpp as CPU-only static libraries
-into `Vendor/llama-cpu`.
+`Tools/build_llama_ios.sh` builds llama.cpp (a submodule pinned to b12063)
+as CPU-only static libraries into `Vendor/llama-cpu`, which isn't in git:
+Metal alone would use ~45 MB of the keyboard's ~76 MB memory limit.
 
 ## Project layout
 
@@ -130,8 +133,8 @@ into `Vendor/llama-cpu`.
 | `Shared/` | Settings shared by the app and the keyboard |
 | `UITests/` | On-device tests, typing benchmark, screenshot and demo runs |
 | `Models/` | Word list and the small correction model |
-| `Tools/` | llama.cpp build script, icon generator |
-| `Vendor/` | llama.cpp static libraries |
+| `Tools/` | llama.cpp build script and module map, icon generator |
+| `Vendor/` | llama.cpp (submodule) |
 
 See `CHANGELOG.md` for what changed in each build.
 
@@ -139,7 +142,7 @@ See `CHANGELOG.md` for what changed in each build.
 
 | Component | Licence |
 |---|---|
-| [llama.cpp](https://github.com/ggml-org/llama.cpp) (`Vendor/llama-cpu`) | MIT |
+| [llama.cpp](https://github.com/ggml-org/llama.cpp) (`Vendor/llama.cpp`, submodule) | MIT |
 | [AzooKeyKanaKanjiConverter](https://github.com/azooKey/AzooKeyKanaKanjiConverter) (Swift package, [patched fork](https://github.com/Iito/AzooKeyKanaKanjiConverter/tree/tsumukey)) | MIT |
 | azooKey's dictionary (inside the converter) | Apache 2.0 |
 | [Gemma 3 270M](https://ai.google.dev/gemma) (downloaded, pruned) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) |

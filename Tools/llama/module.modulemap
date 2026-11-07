@@ -1,0 +1,14 @@
+// llama.cpp b12063, built CPU-only (no Metal) as static libraries: the
+// Metal backend alone costs ~45 MB at startup, more than half of an iOS
+// keyboard's memory budget. Built by Tools/build_llama_ios.sh from the
+// Vendor/llama.cpp submodule, which copies this file next to the headers.
+module llama {
+    header "llama.h"
+    link "llama"
+    link "ggml"
+    link "ggml-base"
+    link "ggml-cpu"
+    link "c++"
+    link framework "Accelerate"
+    export *
+}

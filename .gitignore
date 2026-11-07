@@ -13,7 +13,9 @@ Models/gemma-3-270m-enfr32k-Q4_0.gguf
 Models/gemma-3-270m-enfr48k-Q4_0.gguf
 Models/lexicon-enfr.bin
 
-# Old llama.cpp xcframework, replaced by Vendor/llama-cpu (Tools/build_llama_ios.sh).
+# llama.cpp libraries built from the submodule (Tools/build_llama_ios.sh),
+# and the old xcframework.
+Vendor/llama-cpu/
 Vendor/llama/
 
 # Gemma is downloaded by the app (Hugging Face); training code is in tsumukey-train.

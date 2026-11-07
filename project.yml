@@ -55,6 +55,14 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.tsumukey
         SWIFT_INCLUDE_PATHS: $(SRCROOT)/Vendor/llama-cpu/include
         LIBRARY_SEARCH_PATHS: $(SRCROOT)/Vendor/llama-cpu/lib/$(PLATFORM_NAME)
+    preBuildScripts:
+      - name: Check llama.cpp
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ ! -f "$SRCROOT/Vendor/llama-cpu/lib/$PLATFORM_NAME/libllama.a" ]; then
+            echo "error: llama.cpp isn't built. Run Tools/build_llama_ios.sh once (needs cmake and ninja)."
+            exit 1
+          fi
     dependencies:
       - target: Keyboard
 
@@ -99,6 +107,14 @@ targets:
         # llama.cpp, CPU-only static build (Tools/build_llama_ios.sh).
         SWIFT_INCLUDE_PATHS: $(SRCROOT)/Vendor/llama-cpu/include
         LIBRARY_SEARCH_PATHS: $(SRCROOT)/Vendor/llama-cpu/lib/$(PLATFORM_NAME)
+    preBuildScripts:
+      - name: Check llama.cpp
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ ! -f "$SRCROOT/Vendor/llama-cpu/lib/$PLATFORM_NAME/libllama.a" ]; then
+            echo "error: llama.cpp isn't built. Run Tools/build_llama_ios.sh once (needs cmake and ninja)."
+            exit 1
+          fi
     dependencies:
       - package: AzooKeyKanaKanjiConverter
         product: KanaKanjiConverterModuleWithDefaultDictionary

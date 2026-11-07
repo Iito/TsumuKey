@@ -28,8 +28,6 @@ struct ContentView: View {
                                  ? "Add the TsumuKey keyboard, turn on Allow Full Access, then open the keyboard once (in the field above). Until then it uses default settings."
                                  : "The keyboard can't read your settings or downloaded models. Settings → General → Keyboard → Keyboards → TsumuKey → Allow Full Access.")
                                 .font(.callout)
-                            Text("iOS doesn't let apps ask for this; it's only switched on in Settings. TsumuKey uses it to share settings and models with the keyboard. The keyboard never goes online.")
-                                .font(.footnote).foregroundStyle(.secondary)
                         }
                         Button("Open Settings") {
                             if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
@@ -39,14 +37,18 @@ struct ContentView: View {
 
                 Section {
                     Text("1. Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey")
-                    Text("2. Tap TsumuKey in that list and turn on **Allow Full Access**, so the keyboard can read the settings below. iOS shows a warning for every keyboard with Full Access; TsumuKey's keyboard has no network access and nothing you type leaves your phone.")
+                    Text("2. Tap TsumuKey in that list and turn on **Allow Full Access**.")
                     Button("Open Settings") {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
                         }
                     }
                 } header: {
-                    Text("Set up")
+                    InfoHeader("Set up", info: [
+                        "Full Access lets the keyboard read the settings and models this app keeps for it. Without it, the keyboard uses default settings and the built-in model.",
+                        "iOS shows a warning for every keyboard with Full Access. TsumuKey's keyboard never goes online, and nothing you type leaves your phone.",
+                        "iOS doesn't let apps ask for Full Access; it can only be turned on in Settings.",
+                    ])
                 }
                 .font(.callout)
                 // The keyboard reports each time it opens (drives the Full Access card).
@@ -78,23 +80,16 @@ struct ContentView: View {
                         ForEach(KeyboardSettings.currencies, id: \.self) { Text($0).tag($0) }
                     }
                 } header: {
-                    Text("Keyboard")
-                } footer: {
-                    Text("Japanese keyboard: かな is the flick pad, ローマ字 types romaji on the letter keys. Japanese in ABC: typing romaji (watashi, arigatou) offers 私, ありがとう in the bar; tap it to swap. Holding 123 opens the other number layout. Long-press still shows symbols when they're hidden. The quick currency sits on the third key of the middle row (D on QWERTY, S on Colemak, E on Dvorak); long-press it for the others.")
+                    InfoHeader("Keyboard", info: [
+                        "Japanese keyboard: かな is the flick pad; ローマ字 types romaji on the letter keys.",
+                        "Japanese in ABC: typing romaji (watashi, arigatou) offers 私, ありがとう in the bar; tap it to swap.",
+                        "Holding 123 opens the other number layout.",
+                        "Long-press still shows symbols when they're hidden on the keys.",
+                        "Hide-keyboard button: a ⌄ at the right end of the suggestion bar, in every app. It always shows in this app's test field.",
+                        "Quick currency sits on the third key of the middle row (D on QWERTY, S on Colemak, E on Dvorak); long-press it for the others.",
+                    ])
                 }
 
-                Section {
-                    NavigationLink {
-                        OrderedListPage(title: "Prediction Languages",
-                                        items: $settings.predictionLanguages, all: PredictionLanguage.allCases,
-                                        name: \.name, limit: KeyboardSettings.maxPredictionLanguages,
-                                        firstNote: nil, topAction: "Move to Top",
-                                        footer: "Up to \(KeyboardSettings.maxPredictionLanguages). Suggestions and autocorrect mix them; more would make autocorrect swap right words for look-alikes in another language.")
-                    } label: {
-                        LabeledContent("Prediction Languages",
-                                       value: settings.predictionLanguages.map(\.name).joined(separator: ", "))
-                    }
-                }
 
                 Section {
                     Picker("Theme", selection: $settings.theme) {
@@ -123,9 +118,10 @@ struct ContentView: View {
                         }
                     }
                 } header: {
-                    Text("Look")
-                } footer: {
-                    Text("Pick one colour scheme. Vowels can be coloured on top of any of them. Changes apply the next time the keyboard opens.")
+                    InfoHeader("Look", info: [
+                        "Pick one letter colour scheme: all keys, by row, or by thumb.",
+                        "Vowels can be coloured on top of any scheme.",
+                    ])
                 }
 
                 Section {
@@ -135,9 +131,13 @@ struct ContentView: View {
                     TimingSlider(title: "Time to chain taps", value: $timing.multiTapWindow, range: 0.15...0.6)
                     Button("Reset to defaults") { timing = DeleteTiming() }
                 } header: {
-                    Text("Delete key")
-                } footer: {
-                    Text("Tap: one character. Hold: characters, repeating. Tap then hold: one word. Double tap then hold: word after word. Lower numbers are faster.")
+                    InfoHeader("Delete key", info: [
+                        "Tap: one character.",
+                        "Hold: characters, repeating.",
+                        "Tap then hold: one word.",
+                        "Double tap then hold: word after word.",
+                        "Lower numbers are faster.",
+                    ])
                 }
 
                 // Version at the very bottom; matches the entries in CHANGELOG.md.
@@ -215,7 +215,8 @@ private struct LayoutList: View {
                                 items: $settings.menuLayouts, all: LetterLayout.allCases,
                                 name: \.name, limit: KeyboardSettings.maxMenuLayouts, firstNote: "Default",
                                 topAction: "Make Default",
-                                footer: "Up to \(KeyboardSettings.maxMenuLayouts). The first one is the default.")
+                                info: ["Up to \(KeyboardSettings.maxMenuLayouts) layouts. The first one is the default: the keyboard opens on it.",
+                                       "Hold the ⚙︎ key on the keyboard to switch between them. The Japanese keyboard is always in that menu too."])
                     .onChange(of: settings.menuLayouts) { _, list in
                         // The keyboard opens on the top layout.
                         if let first = list.first, first != settings.layout { settings.layout = first }
@@ -223,8 +224,6 @@ private struct LayoutList: View {
             } label: {
                 LabeledContent("Layouts", value: settings.menuLayouts.map(\.name).joined(separator: ", "))
             }
-        } footer: {
-            Text("The first layout is the default. Hold the ⚙︎ key to switch between them; the Japanese keyboard is always in that menu too.")
         }
     }
 }
@@ -232,7 +231,7 @@ private struct LayoutList: View {
 /// One page for an ordered pick list: what's in use on top (first = default),
 /// everything else below. Tap to add (greyed out when full). Swipe left to
 /// remove, right to move to the top. At least 1 item, at most `limit`.
-private struct OrderedListPage<Item: Identifiable & Hashable>: View {
+struct OrderedListPage<Item: Identifiable & Hashable>: View {
     let title: String
     @Binding var items: [Item]
     let all: [Item]
@@ -241,7 +240,7 @@ private struct OrderedListPage<Item: Identifiable & Hashable>: View {
     /// Shown under the first row ("Default"), or nil.
     let firstNote: String?
     let topAction: String
-    let footer: String
+    let info: [String]
 
     private var rest: [Item] { all.filter { !items.contains($0) } }
 
@@ -273,7 +272,7 @@ private struct OrderedListPage<Item: Identifiable & Hashable>: View {
             } header: {
                 Text("In use")
             } footer: {
-                Text(footer + " Swipe left to remove, right to \(topAction.lowercased()).")
+                Text("Swipe left to remove, right to \(topAction.lowercased()).")
             }
 
             if !rest.isEmpty {
@@ -299,6 +298,43 @@ private struct OrderedListPage<Item: Identifiable & Hashable>: View {
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar { InfoButton(title: title, info: info) }
+    }
+}
+
+/// Section header with an ⓘ that opens the section's explanation, so the
+/// settings list itself stays short.
+struct InfoHeader: View {
+    let title: String
+    let info: [String]
+    init(_ title: String, info: [String]) { self.title = title; self.info = info }
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            InfoButton(title: title, info: info).textCase(nil)
+        }
+    }
+}
+
+struct InfoButton: View {
+    let title: String
+    let info: [String]
+    @State private var shown = false
+
+    var body: some View {
+        Button { shown = true } label: {
+            Image(systemName: "info.circle").imageScale(.large)
+        }
+        .accessibilityLabel("About \(title)")
+        // A system alert, like the mobile-data question. Attached to the button
+        // itself: an alert on a whole list Section is never shown.
+        .alert(title, isPresented: $shown) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(info.joined(separator: "\n\n"))
+        }
     }
 }
 

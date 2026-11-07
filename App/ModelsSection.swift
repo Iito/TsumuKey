@@ -148,7 +148,17 @@ struct ModelsSection: View {
 
     var body: some View {
         Section {
-            Picker("Correction model", selection: $settings.correctionModel) {
+            NavigationLink {
+                OrderedListPage(title: "Prediction Languages",
+                                items: $settings.predictionLanguages, all: PredictionLanguage.allCases,
+                                name: \.name, limit: KeyboardSettings.maxPredictionLanguages,
+                                firstNote: nil, topAction: "Move to Top",
+                                info: ["Up to \(KeyboardSettings.maxPredictionLanguages). Suggestions and autocorrect mix them; more would make autocorrect swap right words for look-alikes in another language."])
+            } label: {
+                LabeledContent("Prediction Languages",
+                               value: settings.predictionLanguages.map(\.name).joined(separator: ", "))
+            }
+            Picker("Model", selection: $settings.correctionModel) {
                 Text(smallLabel).tag(CorrectionModel.dense)
                 Text(gemmaInstalled ? "Gemma 3 (\(ModelStore.gemmaLabel))" : "Gemma 3 (not downloaded)").tag(CorrectionModel.gemma)
                 if !CorrectionModel.choices.contains(settings.correctionModel) {
@@ -199,16 +209,19 @@ struct ModelsSection: View {
                 }
             }
         } header: {
-            Text("Correction model")
+            InfoHeader("Prediction Model", info: [
+                "The model corrects typos and suggests the next word, in your prediction languages (up to \(KeyboardSettings.maxPredictionLanguages)).",
+                "Small is built in. Gemma 3 is larger and optional: download it here.",
+                "The app goes online only when you tap Check or Download, to fetch models from huggingface.co/iito-sama/tsumukey-models. On mobile data it asks before downloading.",
+                "The keyboard never connects, and nothing you type leaves your phone. A new model is used the next time the keyboard opens.",
+            ])
         } footer: {
+            // Only what needs attention; the explanation is behind ⓘ.
             if let e = downloader.error {
                 Text(e).foregroundStyle(.red)
             } else if settings.correctionModel == .gemma && !gemmaInstalled {
                 Text("Gemma isn't downloaded yet, so the keyboard keeps using the small model.")
-            } else {
-                Text("The app goes online only when you tap Check or Download, to fetch models from huggingface.co/iito-sama/tsumukey-models; on mobile data it asks before downloading. The keyboard never connects, and nothing you type leaves your phone. A new model is used the next time the keyboard opens.")
             }
         }
-
     }
 }

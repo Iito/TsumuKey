@@ -13,6 +13,21 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.7.0 (build 50), 2026-11-08
+Installed on the iPhone 15.
+- Explanations moved behind an ⓘ on each section header (Set up, Prediction Model, Keyboard,
+  Look, Delete key) and on the Layouts and Prediction Languages pages; tapping it opens a
+  system alert with OK, like the mobile-data question (build 48 used a half-height
+  sheet, 49 a popover bubble). Footers keep only what needs attention: download errors, "Gemma isn't
+  downloaded yet", "Remove one to add another", the swipe hint, and the version. The Full
+  Access card keeps its title, one line and Open Settings.
+
+## 0.6.1 (build 47), 2026-11-07
+Installed on the iPhone 15.
+- "Correction model" is now "Prediction Model": the same model corrects typos and suggests
+  words (while typing and after a space). Prediction Languages moved into that section, above
+  the model picker; the footer says what the model does. Stored settings are unchanged.
+
 ## 0.6.0 (build 46), 2026-11-07
 Installed on the iPhone 15. Same app as build 45; the version is written 0.6.0 under the
 rules above.

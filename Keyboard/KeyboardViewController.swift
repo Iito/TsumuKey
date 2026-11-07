@@ -9,6 +9,7 @@ final class KeyboardViewController: UIInputViewController {
     private var host: UIHostingController<AnyView>?
     override func viewDidLoad() {
         super.viewDidLoad()
+        startWatchingSettings()
         state.controller = self
 
         installHost()
@@ -76,22 +77,46 @@ final class KeyboardViewController: UIInputViewController {
         if host == nil { installHost() }
         TouchLog.reset()
         // Pick up any changes made in the app since the keyboard last opened.
-        let settings = KeyboardSettings.load()
-        if settings != state.settings { state.settings = settings }
+        applySettings()
         state.setupNote = hasFullAccess ? nil : "Turn on Full Access in Settings to use your TsumuKey settings"
         KeyboardReport(build: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?",
                        openedAt: Date(), fullAccess: hasFullAccess,
                        settingsFound: SharedSettings.defaults.data(forKey: "keyboardSettings") != nil,
-                       layout: settings.layout.rawValue).save()
+                       layout: state.settings.layout.rawValue).save()
+        state.mode = state.textMode
+        state.textChanged()
+        TouchLog.log("LIFE appear footprint=\(Memory.footprintMB())MB")
+    }
+
+    /// Rereads the shared settings: on appear, and while open whenever the app
+    /// changes them (Darwin notification, see startWatchingSettings).
+    private func applySettings() {
+        let settings = KeyboardSettings.load()
+        if settings != state.settings { state.settings = settings }
         heightConstraint?.constant = Metrics.totalHeight(settings)
         // Day/night: the key colours are dynamic, so overriding the style
         // repaints the whole keyboard, background included.
         view.overrideUserInterfaceStyle = settings.theme.style
         state.backspace.timing = DeleteTiming.load()
-        state.mode = state.textMode
-        state.textChanged()
         state.loadEngines()
-        TouchLog.log("LIFE appear footprint=\(Memory.footprintMB())MB")
+    }
+
+    private func startWatchingSettings() {
+        let me = Unmanaged.passUnretained(self).toOpaque()
+        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), me, { _, observer, _, _, _ in
+            guard let observer else { return }
+            let vc = Unmanaged<KeyboardViewController>.fromOpaque(observer).takeUnretainedValue()
+            DispatchQueue.main.async {
+                guard vc.viewIfLoaded?.window != nil else { return }  // reread on next appear instead
+                vc.applySettings()
+                vc.state.textChanged()
+            }
+        }, SharedSettings.changed, nil, .deliverImmediately)
+    }
+
+    deinit {
+        CFNotificationCenterRemoveEveryObserver(CFNotificationCenterGetDarwinNotifyCenter(),
+                                                Unmanaged.passUnretained(self).toOpaque())
     }
 
     /// Opens the TsumuKey app. Extensions aren't given `UIApplication.open`,

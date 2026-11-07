@@ -17,9 +17,17 @@ enum SharedSettings {
         defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(T.self, from: $0) }
     }
 
-    static func save<T: Encodable>(_ value: T, key: String) {
+    /// Darwin notification (no payload) posted when settings change, so an
+    /// open keyboard rereads them without being closed and reopened.
+    static let changed = "com.tsumukey.settingsChanged" as CFString
+
+    static func save<T: Encodable>(_ value: T, key: String, notify: Bool = true) {
         guard let data = try? JSONEncoder().encode(value) else { return }
         defaults.set(data, forKey: key)
+        if notify {
+            CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+                                                 CFNotificationName(changed), nil, nil, true)
+        }
     }
 }
 
@@ -34,7 +42,8 @@ struct KeyboardReport: Codable, Equatable {
     var layout: String
     private static let key = "keyboardReport"
     static func load() -> KeyboardReport? { SharedSettings.load(Self.self, key: key) }
-    func save() { SharedSettings.save(self, key: Self.key) }
+    // Not a settings change: no notification (the keyboard writes this on every open).
+    func save() { SharedSettings.save(self, key: Self.key, notify: false) }
 }
 
 enum LetterLayout: String, Codable, CaseIterable, Identifiable {

@@ -4,6 +4,12 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 36), 2026-11-07
+Installed on the iPhone 15.
+- Settings apply to an open keyboard right away (for example in the app's "Try it here"
+  field): saving a setting posts a Darwin notification (com.tsumukey.settingsChanged, no
+  data), and the keyboard rereads its settings. Before, it only reread them when it appeared.
+
 ## 0.5 (build 35), 2026-11-07
 Installed on the iPhone 15.
 - Cause of build 33's "settings don't work": Full Access was off. The removed named pasteboard

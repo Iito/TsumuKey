@@ -1,10 +1,9 @@
 import Foundation
 import UIKit
 
-/// Settings shared between the app and the keyboard through an App Group.
-/// The keyboard can only read them when it has the App Group entitlement
-/// (paid developer account, or a sideloader that supports groups) and the
-/// user turned on Full Access. Otherwise it silently falls back to defaults.
+/// Settings shared between the app and the keyboard through the App Group.
+/// The keyboard can only read them with Full Access on; otherwise it
+/// silently falls back to defaults.
 enum SharedSettings {
     static let appGroup: String = {
         // AltStore-style sideloaders rename App Groups per Apple ID and
@@ -14,29 +13,13 @@ enum SharedSettings {
     }()
     static let defaults = UserDefaults(suiteName: appGroup) ?? .standard
 
-    // A named pasteboard is shared by apps signed by the same team, and unlike
-    // an App Group it works with a free Apple ID. It is invisible to other
-    // apps and never touches the clipboard you copy and paste with. The
-    // keyboard can only reach it with Full Access on.
-    private static let pasteboardName = UIPasteboard.Name("com.tsumukey.settings")
-    private static var pasteboard: UIPasteboard? { UIPasteboard(name: pasteboardName, create: true) }
-    private static func pasteboardType(_ key: String) -> String { "com.tsumukey." + key }
-
-    /// The pasteboard wins when reachable, since both sides write to it;
-    /// otherwise this side's own storage.
     static func load<T: Decodable>(_ type: T.Type, key: String) -> T? {
-        let data = pasteboard?.data(forPasteboardType: pasteboardType(key)) ?? defaults.data(forKey: key)
-        return data.flatMap { try? JSONDecoder().decode(T.self, from: $0) }
+        defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(T.self, from: $0) }
     }
 
     static func save<T: Encodable>(_ value: T, key: String) {
         guard let data = try? JSONEncoder().encode(value) else { return }
         defaults.set(data, forKey: key)
-        guard let board = pasteboard else { return }
-        // All settings live in one pasteboard item; replace just this key.
-        var item = board.items.first ?? [:]
-        item[pasteboardType(key)] = data
-        board.setItems([item])
     }
 }
 

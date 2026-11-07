@@ -4,6 +4,12 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 33), 2026-11-07
+Installed on the iPhone 15.
+- Settings reach the keyboard through the App Group only. The named pasteboard
+  (com.tsumukey.settings) was a workaround from before the app had an App Group; it is no
+  longer written or read. Full Access is still needed for the keyboard to read settings.
+
 ## 0.5 (build 32), 2026-11-07
 Installed on the iPhone 15.
 - Model updates are visible: the small model's name carries its version ("Small v9 (...)",

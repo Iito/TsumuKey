@@ -4,6 +4,16 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 31), 2026-11-07
+Installed on the iPhone 15.
+- Fix: with one prediction language, suggestions were nearly useless (test set top-3 1.3%).
+  The model was trained with two languages enabled; the one-language word list holds ~800
+  words it never saw as candidates, and they got wild scores ("thomas", "budget"). Found by
+  inspecting the weights and activations (tsumukey-train wsp.py). Ranker.predict now runs a
+  lone language as the pair it was trained on (English+French, French+English,
+  German+French, Spanish+English) and keeps only that language's words: top-3 29.0%,
+  same as with two languages. Two-language results unchanged.
+
 ## 0.5 (build 30), 2026-11-07
 Installed on the iPhone 15.
 - Small model is round 9: round 8's setup trained twice as long (6 epochs). Same

@@ -19,6 +19,20 @@ enum ModelStore {
         let minBuild: Int
         let notes: String?
         var url: URL { ModelStore.repo.appendingPathComponent(file) }
+        /// Training round of a small model (ranker-rN.rank), its version number.
+        var round: Int? { ModelStore.rankerRound(file) }
+    }
+
+    static func rankerRound(_ file: String) -> Int? {
+        guard file.hasPrefix("ranker-r"), file.hasSuffix(".rank") else { return nil }
+        return Int(file.dropFirst(8).dropLast(5))
+    }
+
+    /// Downloaded small models, by round.
+    static func downloadedRankers() -> [(round: Int, url: URL)] {
+        guard let dir = directory,
+              let files = try? FileManager.default.contentsOfDirectory(atPath: dir.path) else { return [] }
+        return files.compactMap { f in rankerRound(f).map { ($0, dir.appendingPathComponent(f)) } }
     }
 
     /// App Group folder; nil when the build has no App Group entitlement.
@@ -40,16 +54,8 @@ enum ModelStore {
     /// or built into the app. An old download must not hide a newer bundled one.
     static func rankerURL() -> (url: URL, round: Int?)? {
         var downloaded: (URL, Int)?
-        if let dir = directory,
-           let files = try? FileManager.default.contentsOfDirectory(atPath: dir.path) {
-            let rounds = files.compactMap { f -> (Int, String)? in
-                guard f.hasPrefix("ranker-r"), f.hasSuffix(".rank"),
-                      let n = Int(f.dropFirst(8).dropLast(5)) else { return nil }
-                return (n, f)
-            }
-            if let best = rounds.max(by: { $0.0 < $1.0 }) {
-                downloaded = (dir.appendingPathComponent(best.1), best.0)
-            }
+        if let best = downloadedRankers().max(by: { $0.round < $1.round }) {
+            downloaded = (best.url, best.round)
         }
         if let d = downloaded, d.1 > bundledRankerRound { return d }
         // The keyboard finds it in its own bundle, the app inside the plug-in.

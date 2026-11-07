@@ -4,6 +4,13 @@ Versions are set in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION
 Bump the build number for every build installed on a phone and add an entry here.
 The app shows its version at the bottom of the "Set up" section (from build 2 on).
 
+## 0.5 (build 32), 2026-11-07
+Installed on the iPhone 15.
+- Model updates are visible: the small model's name carries its version ("Small v9 (...)",
+  the training round), in the picker and in the Hugging Face list. A newer version than the
+  one in use shows "Update from vN" and an Update button instead of a plain Download, and
+  updating deletes the older downloaded file.
+
 ## 0.5 (build 31), 2026-11-07
 Installed on the iPhone 15.
 - Fix: with one prediction language, suggestions were nearly useless (test set top-3 1.3%).

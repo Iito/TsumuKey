@@ -28,6 +28,14 @@ final class ModelDownloader: ObservableObject {
 
     func isInstalled(_ m: ModelStore.Model) -> Bool { _ = revision; return ModelStore.localURL(m.file) != nil }
 
+    /// The version in use when `m` is a newer small model: a downloaded older
+    /// round, or the built-in one. nil when `m` is not an update.
+    func replaces(_ m: ModelStore.Model) -> Int? {
+        _ = revision
+        guard let r = m.round, let current = ModelStore.rankerURL()?.round, current < r else { return nil }
+        return current
+    }
+
     func download(_ m: ModelStore.Model) {
         guard progress[m.id] == nil, let dir = ModelStore.directory else {
             if ModelStore.directory == nil { error = "This build can't share files with the keyboard (no App Group)." }
@@ -41,7 +49,15 @@ final class ModelDownloader: ObservableObject {
                 if Self.sha256(tmp) == m.sha256 {
                     let dest = dir.appendingPathComponent(m.file)
                     try? FileManager.default.removeItem(at: dest)
-                    do { try FileManager.default.moveItem(at: tmp, to: dest) } catch { result = error.localizedDescription }
+                    do {
+                        try FileManager.default.moveItem(at: tmp, to: dest)
+                        // A new small model replaces older downloaded rounds.
+                        if let r = m.round {
+                            for old in ModelStore.downloadedRankers() where old.round < r {
+                                try? FileManager.default.removeItem(at: old.url)
+                            }
+                        }
+                    } catch { result = error.localizedDescription }
                 } else {
                     result = "\(m.name): checksum mismatch, file discarded"
                 }
@@ -84,8 +100,10 @@ struct ModelsSection: View {
     private var gemmaInstalled: Bool { _ = downloader.revision; return ModelStore.gemmaURL() != nil }
     private var smallLabel: String {
         _ = downloader.revision
-        let info = ModelStore.rankerURL().flatMap { ModelStore.rankerInfo($0.url) }
-        return "Small (\(info?.label ?? "4.5 MB"))"
+        let current = ModelStore.rankerURL()
+        let info = current.flatMap { ModelStore.rankerInfo($0.url) }
+        let version = current?.round.map { " v\($0)" } ?? ""
+        return "Small\(version) (\(info?.label ?? "4.5 MB"))"
     }
 
     var body: some View {
@@ -101,14 +119,22 @@ struct ModelsSection: View {
                 HStack {
                     VStack(alignment: .leading) {
                         Text(m.name)
-                        Text(ByteCountFormatter.string(fromByteCount: Int64(m.size), countStyle: .file))
-                            .font(.caption).foregroundStyle(.secondary)
+                        Group {
+                            if let current = downloader.replaces(m) {
+                                Text("Update from v\(current) · " + ByteCountFormatter.string(fromByteCount: Int64(m.size), countStyle: .file))
+                            } else {
+                                Text(ByteCountFormatter.string(fromByteCount: Int64(m.size), countStyle: .file))
+                            }
+                        }
+                        .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                     if let p = downloader.progress[m.id] {
                         ProgressView(value: p).frame(width: 80)
                     } else if downloader.isInstalled(m) {
                         Button("Delete", role: .destructive) { downloader.delete(m) }.buttonStyle(.borderless)
+                    } else if downloader.replaces(m) != nil {
+                        Button("Update") { downloader.download(m) }.buttonStyle(.borderless)
                     } else {
                         Button("Download") { downloader.download(m) }.buttonStyle(.borderless)
                     }

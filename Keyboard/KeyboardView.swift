@@ -35,8 +35,14 @@ struct KeyboardView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            SuggestionBar(state: state)
-                .frame(height: Metrics.suggestionBarHeight)
+            Group {
+                if state.emojiSearch != nil {
+                    EmojiSearchBar(state: state)
+                } else {
+                    SuggestionBar(state: state)
+                }
+            }
+            .frame(height: Metrics.suggestionBarHeight)
             keys
         }
         .frame(height: Metrics.totalHeight(state.settings))
@@ -387,46 +393,215 @@ struct KeyView: View {
 
 }
 
-/// Basic emoji picker: recently used first, then everything else.
-/// Apple's emoji keyboard can't be opened from a custom keyboard.
+/// Emoji picker: a search pill, the emoji by category (recently used first),
+/// and a category bar to jump between them. Apple's emoji keyboard can't be
+/// opened from a custom keyboard.
 private struct EmojiPanel: View {
     @ObservedObject var state: KeyboardState
     let size: CGSize
 
     private let cell: CGFloat = 40
+    private let searchHeight: CGFloat = 36
+    @State private var current: EmojiData.Category = .smileys
+    @State private var visible: Set<Int> = []
+
+    private struct Item { let emoji: String; let base: String; let category: EmojiData.Category }
+
+    private var items: [Item] {
+        state.recentEmoji.map { Item(emoji: $0, base: $0, category: .recents) }
+            + EmojiData.entries.map { Item(emoji: EmojiData.toned($0.emoji, state.settings.emojiSkinTone),
+                                           base: $0.emoji, category: $0.category) }
+    }
 
     var body: some View {
         let bottomBar = CGFloat(state.settings.rowHeight)
-        let gridRows = max(1, Int((size.height - bottomBar) / cell))
-        let items = state.recentEmoji + EmojiData.all
+        let gridHeight = size.height - bottomBar - searchHeight
+        let gridRows = max(1, Int(gridHeight / cell))
+        let items = self.items
+        let firsts = Dictionary(items.indices.map { (items[$0].category, $0) }, uniquingKeysWith: min)
 
         VStack(spacing: 0) {
+            if let choices = state.tonePicker {
+                TonePickerRow(state: state, choices: choices)
+                    .frame(height: searchHeight)
+            } else {
+            Button {
+                state.keyDown()
+                state.startEmojiSearch()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                    Text("Search emoji")
+                    Spacer()
+                }
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .frame(height: searchHeight - 8)
+                .background(Palette.key, in: Capsule())
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+            }
+            .buttonStyle(.plain)
+            }
+
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHGrid(rows: Array(repeating: GridItem(.fixed(cell), spacing: 0), count: gridRows), spacing: 0) {
+                        ForEach(items.indices, id: \.self) { i in
+                            Text(items[i].emoji)
+                                .font(.system(size: 30))
+                                .frame(width: cell + 4, height: cell)
+                                .contentShape(Rectangle())
+                                .id(i)
+                                .onTapGesture {
+                                    state.keyDown()
+                                    state.tonePicker = nil
+                                    state.insertEmoji(items[i].emoji)
+                                }
+                                .onLongPressGesture(minimumDuration: 0.35) {
+                                    if let choices = EmojiData.toneChoices(items[i].base) {
+                                        state.keyDown()
+                                        state.tonePicker = choices
+                                    }
+                                }
+                                // The category of the leftmost visible emoji is the current one.
+                                .onAppear { visible.insert(i); updateCurrent(items) }
+                                .onDisappear { visible.remove(i); updateCurrent(items) }
+                        }
+                    }
+                    .padding(.horizontal, 6)
+                }
+                .frame(height: gridHeight)
+
+                HStack(spacing: 0) {
+                    KeyView(key: Key(action: .toLetters), state: state, large: false)
+                        .frame(width: 56, height: bottomBar)
+                    ForEach(EmojiData.Category.allCases) { c in
+                        if let first = firsts[c] {
+                            Button {
+                                state.keyDown()
+                                current = c
+                                proxy.scrollTo(first, anchor: .leading)
+                            } label: {
+                                Image(systemName: c.symbol)
+                                    .font(.system(size: 15))
+                                    .foregroundStyle(current == c ? Color.primary : Color.secondary)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(c.name)
+                        }
+                    }
+                    KeyView(key: Key(action: .backspace), state: state, large: false)
+                        .frame(width: 56, height: bottomBar)
+                }
+                .frame(height: bottomBar)
+            }
+        }
+    }
+
+    private func updateCurrent(_ items: [Item]) {
+        guard let first = visible.min(), first < items.count else { return }
+        let c = items[first].category
+        if c != current { current = c }
+    }
+}
+
+/// The long-pressed emoji in its default yellow and five skin tones; tap one
+/// to type it, ✕ to close.
+private struct TonePickerRow: View {
+    @ObservedObject var state: KeyboardState
+    let choices: [String]
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(choices, id: \.self) { emoji in
+                Text(emoji)
+                    .font(.system(size: 26))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        state.keyDown()
+                        state.tonePicker = nil
+                        state.insertEmoji(emoji)
+                    }
+            }
+            Button {
+                state.keyDown()
+                state.tonePicker = nil
+            } label: {
+                Image(systemName: "xmark").font(.system(size: 14, weight: .medium))
+                    .frame(width: 36).frame(maxHeight: .infinity).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close skin tones")
+        }
+        .background(Palette.key.opacity(0.6), in: Capsule())
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+    }
+}
+
+/// Emoji search: the query (typed on the letter keys below) and the matches,
+/// in the suggestion bar's place. ✕ goes back to the emoji panel.
+private struct EmojiSearchBar: View {
+    @ObservedObject var state: KeyboardState
+
+    var body: some View {
+        let query = state.emojiSearch ?? ""
+        let results = EmojiData.search(query)
+        let tone = state.settings.emojiSkinTone
+        HStack(spacing: 6) {
+            Button {
+                state.keyDown()
+                state.endEmojiSearch()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .medium))
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close search")
+            HStack(spacing: 4) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                Text(query.isEmpty ? "Search emoji" : query)
+                    .foregroundStyle(query.isEmpty ? .secondary : .primary)
+                    .lineLimit(1)
+            }
+            .font(.system(size: 15))
+            .padding(.horizontal, 8)
+            .frame(height: 30)
+            .background(Palette.key, in: Capsule())
+            .fixedSize()
+            if let choices = state.tonePicker {
+                TonePickerRow(state: state, choices: choices)
+            } else {
             ScrollView(.horizontal, showsIndicators: false) {
-                LazyHGrid(rows: Array(repeating: GridItem(.fixed(cell), spacing: 0), count: gridRows), spacing: 0) {
-                    ForEach(Array(items.enumerated()), id: \.offset) { _, emoji in
-                        Text(emoji)
-                            .font(.system(size: 30))
-                            .frame(width: cell + 4, height: cell)
+                HStack(spacing: 0) {
+                    ForEach(results, id: \.self) { base in
+                        Text(EmojiData.toned(base, tone))
+                            .font(.system(size: 26))
+                            .frame(width: 38, height: 38)
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 state.keyDown()
-                                state.insertEmoji(emoji)
+                                state.insertEmoji(EmojiData.toned(base, tone))
+                            }
+                            .onLongPressGesture(minimumDuration: 0.35) {
+                                if let choices = EmojiData.toneChoices(base) {
+                                    state.keyDown()
+                                    state.tonePicker = choices
+                                }
                             }
                     }
                 }
-                .padding(.horizontal, 6)
             }
-            .frame(height: size.height - bottomBar)
-
-            HStack(spacing: 0) {
-                KeyView(key: Key(action: .toLetters), state: state, large: false)
-                    .frame(width: 70, height: bottomBar)
-                Spacer()
-                KeyView(key: Key(action: .backspace), state: state, large: false)
-                    .frame(width: 70, height: bottomBar)
             }
-            .padding(.horizontal, 3)
         }
+        .padding(.horizontal, 6)
     }
 }
 

@@ -13,6 +13,28 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.9.0 (build 52), 2026-11-08
+Installed on the iPhone 15.
+- Emoji skin tones: a default "Emoji skin tone" setting (Keyboard section) applies to the
+  emoji panel and search results; long-press an emoji with tones (305 of them, e.g. 🤷‍♂️)
+  for the default yellow and all five tones. emoji.tsv gains a column with each emoji's five
+  tone versions (only versions with one tone throughout).
+- English "i", "i'm", "i'll", "i've", "i'd" are always capitalized. The rule existed but was
+  skipped for learned words; most likely undoing the fix once had taught the keyboard "i"
+  (not confirmed: the learned list isn't readable from the Mac).
+
+## 0.8.0 (build 51), 2026-11-08
+Installed on the iPhone 15.
+- Emoji search: a "Search emoji" pill on the emoji panel brings up the letter keys; letters,
+  space and delete edit the query (not the document), and the suggestion bar shows the query
+  and the matches. Keywords in English, French, German, Spanish and Japanese (CLDR), so
+  "heart", "cœur", "herz", "corazón" all find ❤️. ✕, return or ABC go back to the panel.
+- Emoji by category, in Unicode's order: Recently used, Smileys, People, Animals, Food,
+  Travel, Activities, Objects, Symbols, Flags. A category bar between ABC and delete jumps to
+  each; the current one is highlighted as you scroll.
+- Data: Keyboard/emoji.tsv (1,870 emoji, Unicode 15.0 for iOS 17, no skin-tone variants,
+  419 KB), built by tsumukey-train tools/build_emoji.py.
+
 ## 0.7.0 (build 50), 2026-11-08
 Installed on the iPhone 15.
 - Explanations moved behind an ⓘ on each section header (Set up, Prediction Model, Keyboard,

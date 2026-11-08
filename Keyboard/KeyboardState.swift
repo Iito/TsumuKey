@@ -213,6 +213,24 @@ final class KeyboardState: ObservableObject {
         // The app switched the Japanese keyboard while the other one was up.
         didSet { if textMode.isJapanese && textMode != japaneseMode { switchTo(japaneseMode) } }
     }
+    /// Emoji search in progress: letters, space and delete edit this instead
+    /// of the document; the suggestion bar shows the query and the matches.
+    @Published var emojiSearch: String?
+    /// Emoji whose skin tones are shown after a long press (base and five tones).
+    @Published var tonePicker: [String]?
+
+    func startEmojiSearch() {
+        emojiSearch = ""
+        shift = .off
+        mode = .letters
+    }
+
+    func endEmojiSearch() {
+        emojiSearch = nil
+        tonePicker = nil
+        mode = .emoji
+    }
+
     @Published private(set) var recentEmoji = UserDefaults.standard.stringArray(forKey: "recentEmoji") ?? []
 
     @Published var oneHand: OneHandSide? = UserDefaults.standard.string(forKey: "oneHand").flatMap(OneHandSide.init) {
@@ -314,9 +332,15 @@ final class KeyboardState: ObservableObject {
     /// Applies a correction that's already known: one the bar computed for
     /// exactly this word, or a missing apostrophe.
     private func applyCorrection(_ word: String) -> (original: String, corrected: String)? {
-        guard !word.isEmpty, mode == .letters, settings.autocorrect, rejectedWord == nil, !isKnown(word) else { return nil }
+        guard !word.isEmpty, mode == .letters, settings.autocorrect, rejectedWord == nil else { return nil }
+        // English "i" (and i'm, i'll…) is always capitalized, even if it was once
+        // learned by undoing the fix: learned words only protect real words.
+        let pronoun = Suggester.pronounI(for: word)
+        guard pronoun != nil || !isKnown(word) else { return nil }
         let fix: String?
-        if let contraction = Suggester.contraction(for: word) {
+        if let pronoun {
+            fix = pronoun
+        } else if let contraction = Suggester.contraction(for: word) {
             fix = contraction
         } else if correctionWord == word {
             fix = pendingCorrection
@@ -371,6 +395,10 @@ final class KeyboardState: ObservableObject {
     }
 
     func deleteBackward() {
+        if emojiSearch != nil {
+            if emojiSearch?.isEmpty == false { emojiSearch?.removeLast() }
+            return
+        }
         if isComposing {
             deleteComposing()
             return
@@ -398,6 +426,12 @@ final class KeyboardState: ObservableObject {
     /// Deletes like Option-Delete on a Mac: trailing spaces, then either the
     /// word or the run of punctuation before them.
     func deleteWordBackward() {
+        if var q = emojiSearch {
+            while q.last == " " { q.removeLast() }
+            while let c = q.last, c != " " { q.removeLast() }
+            emojiSearch = q
+            return
+        }
         if isComposing {
             // Holding delete while composing wipes the whole composition.
             composing = ComposingText()
@@ -533,6 +567,27 @@ final class KeyboardState: ObservableObject {
     /// What a key does when tapped (released without a long-press).
     /// `point`: where the finger landed, in key-map coordinates.
     func tap(_ key: Key, at point: CGPoint? = nil) {
+        if emojiSearch != nil {
+            switch key.action {
+            case .text(let s):
+                emojiSearch? += s.lowercased()
+                if shift == .on { shift = .off }
+                return
+            case .space:
+                emojiSearch? += " "
+                return
+            case .returnKey, .emoji:
+                endEmojiSearch()
+                return
+            case .toLetters where mode == .letters:
+                endEmojiSearch()
+                return
+            case .language, .cursor, .kanaModifier:
+                return  // they act on the document
+            default:
+                break   // shift, number pages, globe: as usual
+            }
+        }
         switch key.action {
         case .text(let s) where mode == .kana:
             compose(s)

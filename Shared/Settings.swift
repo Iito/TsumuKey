@@ -80,6 +80,8 @@ struct KeyboardSettings: Codable, Equatable {
     /// Hide-keyboard button at the right end of the suggestion bar, in every app
     /// (it always shows in the app's own test field).
     var hideKeyboardButton = false
+    /// Skin tone for emoji that have them: 0 = default yellow, 1...5 light to dark.
+    var emojiSkinTone = 0
     /// The currency on the D-position key's corner.
     var currency = "$"
     /// Height of one key row in points (the system keyboard is about 44–46).
@@ -117,6 +119,7 @@ struct KeyboardSettings: Codable, Equatable {
         numberRow = try c.decodeIfPresent(Bool.self, forKey: .numberRow) ?? d.numberRow
         showSymbolHints = try c.decodeIfPresent(Bool.self, forKey: .showSymbolHints) ?? d.showSymbolHints
         hideKeyboardButton = try c.decodeIfPresent(Bool.self, forKey: .hideKeyboardButton) ?? d.hideKeyboardButton
+        emojiSkinTone = try c.decodeIfPresent(Int.self, forKey: .emojiSkinTone) ?? d.emojiSkinTone
         currency = try c.decodeIfPresent(String.self, forKey: .currency) ?? d.currency
         rowHeight = try c.decodeIfPresent(Double.self, forKey: .rowHeight) ?? d.rowHeight
         autocorrect = try c.decodeIfPresent(Bool.self, forKey: .autocorrect) ?? d.autocorrect

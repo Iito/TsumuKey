@@ -76,6 +76,8 @@ final class KeyboardViewController: UIInputViewController {
         super.viewWillAppear(animated)
         if host == nil { installHost() }
         TouchLog.reset()
+        state.emojiSearch = nil
+        state.tonePicker = nil
         // Pick up any changes made in the app since the keyboard last opened.
         applySettings()
         state.inAppField = SharedSettings.defaults.bool(forKey: SharedSettings.inAppFieldKey)

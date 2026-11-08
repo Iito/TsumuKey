@@ -122,6 +122,16 @@ enum Suggester {
 }
 
 extension Suggester {
+    /// English "i", "i'm", "i'll", "i've", "i'd" with a capital I, or nil
+    /// (also nil when already capitalized or English is off).
+    static func pronounI(for word: String) -> String? {
+        guard languages.contains(.english) else { return nil }
+        let w = word.replacingOccurrences(of: "’", with: "'")
+        guard ["i", "i'm", "i'll", "i've", "i'd"].contains(w) else { return nil }
+        let fixed = "I" + word.dropFirst()
+        return fixed == word ? nil : fixed
+    }
+
     /// A missing apostrophe fixed without asking ("im" → "I'm"), or nil.
     static func contraction(for word: String) -> String? {
         guard let fix = contractions[word.lowercased()] else { return nil }

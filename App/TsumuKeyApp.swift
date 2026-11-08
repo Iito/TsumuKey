@@ -75,6 +75,9 @@ struct ContentView: View {
                     }
                     Toggle("Show symbols on keys", isOn: $settings.showSymbolHints)
                     Toggle("Hide-keyboard button", isOn: $settings.hideKeyboardButton)
+                    Picker("Emoji skin tone", selection: $settings.emojiSkinTone) {
+                        ForEach(0..<6) { t in Text(["✋", "✋🏻", "✋🏼", "✋🏽", "✋🏾", "✋🏿"][t]).tag(t) }
+                    }
                     RowHeightSlider(rowHeight: $settings.rowHeight)
                     Picker("Quick currency", selection: $settings.currency) {
                         ForEach(KeyboardSettings.currencies, id: \.self) { Text($0).tag($0) }
@@ -86,6 +89,7 @@ struct ContentView: View {
                         "Holding 123 opens the other number layout.",
                         "Long-press still shows symbols when they're hidden on the keys.",
                         "Hide-keyboard button: a ⌄ at the right end of the suggestion bar, in every app. It always shows in this app's test field.",
+                        "Emoji skin tone applies to the emoji panel and search; long-press an emoji there for the other tones.",
                         "Quick currency sits on the third key of the middle row (D on QWERTY, S on Colemak, E on Dvorak); long-press it for the others.",
                     ])
                 }

@@ -12,9 +12,12 @@ final class Ranker: WordScorer {
     /// Multiplies every score (tuning knob for the bench).
     var weight: Float = 1
     var languages: [PredictionLanguage] = [.english, .french] {
-        didSet { lastContext = nil }
+        didSet { lastContext = nil; if languages != oldValue { predictionConstants.removeAll() } }
     }
-    var lexicon: Lexicon?
+    var lexicon: Lexicon? { didSet { predictionCache.removeAll(); predictionConstants.removeAll(); shortlistMask = nil } }
+    private var predictionCache: [String: (projection: [Float], zipfs: [Float])] = [:]
+    private var predictionConstants: [String: [Float]] = [:]
+    private var predictionContext: [Float]?
 
     private let buckets, dim, layers, hidden, experts, ctxLen, maxNG, expertHidden, nFeat: Int
     private let hasShared: Bool
@@ -92,6 +95,7 @@ final class Ranker: WordScorer {
     func setContext(_ text: String) -> Bool {
         guard text != lastContext else { return true }
         lastContext = text
+        predictionContext = nil
         let toks = Array((["<s>"] + Self.tokens(text)).suffix(ctxLen))
         let d = dim, pad = ctxLen - toks.count
         // x[t]: word vector + position; padding rows stay masked.
@@ -126,14 +130,22 @@ final class Ranker: WordScorer {
         let bits = langBits()
         return words.map { word in
             let w = word.lowercased().replacingOccurrences(of: "’", with: "'")
-            let v = wordVector(w)
-            var c = cprojB
-            for i in 0..<d {
-                var s: Float = 0
-                for j in 0..<d { s += cprojW[i * d + j] * v[j] }
-                c[i] += s
+            let c: [Float]
+            let z: [Float]
+            if predicting, let cached = predictionCache[w] {
+                c = cached.projection; z = cached.zipfs
+            } else {
+                let v = wordVector(w)
+                var projection = cprojB
+                for i in 0..<d {
+                    var sum: Float = 0
+                    for j in 0..<d { sum += cprojW[i * d + j] * v[j] }
+                    projection[i] += sum
+                }
+                c = projection
+                z = lexicon?.zipfs(of: w) ?? [0, 0, 0, 0]
+                if predicting { predictionCache[w] = (c, z) }
             }
-            let z = lexicon?.zipfs(of: w) ?? [0, 0, 0, 0]
             var feats = [Float](repeating: 0, count: nFeat)
             var zmax: Float = 0
             for l in 0..<4 { feats[l] = z[l] * bits[l] / 8; zmax = max(zmax, z[l] * bits[l]) }
@@ -142,6 +154,47 @@ final class Ranker: WordScorer {
                 feats[6] = 1; feats[7] = t.isWord ? 1 : 0
             }
             if nFeat == 9 { feats[8] = predicting ? 1 : 0 }  // task flag: suggesting, not correcting
+            if predicting && experts == 0 && !hasShared {
+                let base: [Float]
+                if let existing = predictionConstants[w] {
+                    base = existing
+                } else {
+                    var constant = b1
+                    for i in 0..<d where c[i] != 0 {
+                        let row = (d + i) * expertHidden
+                        for k in 0..<expertHidden { constant[k] += c[i] * w1[row + k] }
+                    }
+                    for i in 0..<nFeat where feats[i] != 0 {
+                        let row = (3 * d + i) * expertHidden
+                        for k in 0..<expertHidden { constant[k] += feats[i] * w1[row + k] }
+                    }
+                    base = constant
+                    predictionConstants[w] = constant
+                }
+                let ctx: [Float]
+                if let existing = predictionContext {
+                    ctx = existing
+                } else {
+                    var value = [Float](repeating: 0, count: expertHidden)
+                    for i in 0..<d where h[i] != 0 {
+                        let row = i * expertHidden
+                        for k in 0..<expertHidden { value[k] += h[i] * w1[row + k] }
+                    }
+                    ctx = value
+                    predictionContext = value
+                }
+                var a = base
+                for k in 0..<expertHidden { a[k] += ctx[k] }
+                for i in 0..<d {
+                    let x = h[i] * c[i]
+                    if x == 0 { continue }
+                    let row = (2 * d + i) * expertHidden
+                    for k in 0..<expertHidden { a[k] += x * w1[row + k] }
+                }
+                var result = b2[0]
+                for k in 0..<expertHidden where a[k] > 0 { result += a[k] * w2[k] }
+                return result * weight
+            }
             var input = [Float](repeating: 0, count: nin)
             for j in 0..<d { input[j] = h[j]; input[d + j] = c[j]; input[2 * d + j] = h[j] * c[j] }
             for j in 0..<nFeat { input[3 * d + j] = feats[j] }
@@ -162,6 +215,8 @@ final class Ranker: WordScorer {
         // Round 10 on is trained with one or two languages enabled, so the list
         // is simply the most frequent words of whatever is on.
         if shortlistMask != mask {
+            predictionCache.removeAll()
+            predictionConstants.removeAll()
             shortlist = lexicon.completions("", limit: Self.shortlistSize).map(\.word)
             shortlistMask = mask
         }

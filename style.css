@@ -1,0 +1,55 @@
+:root {
+  --bg: #fbfaf7;
+  --fg: #1d1c1a;
+  --muted: #6b6760;
+  --line: #e4e0d8;
+  --card: #ffffff;
+  --accent: #c8102e;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #151413;
+    --fg: #ecebe8;
+    --muted: #a19c94;
+    --line: #2d2b28;
+    --card: #1e1d1b;
+    --accent: #ff4d63;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", sans-serif;
+}
+main, header, footer { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+header { display: flex; justify-content: space-between; align-items: center; padding-top: 20px; }
+header a.brand { font-weight: 700; color: var(--fg); text-decoration: none; }
+nav a { color: var(--muted); text-decoration: none; margin-left: 18px; }
+nav a:hover, nav a[aria-current] { color: var(--fg); }
+a { color: var(--accent); }
+h1 { font-size: 2.4rem; line-height: 1.15; margin: 48px 0 12px; letter-spacing: -0.02em; }
+h1 .kanji { color: var(--accent); }
+h2 { font-size: 1.35rem; margin: 48px 0 8px; }
+.lead { font-size: 1.2rem; color: var(--muted); margin: 0 0 32px; }
+.demo { display: block; width: 100%; max-width: 360px; margin: 0 auto; border-radius: 18px; border: 1px solid var(--line); }
+figcaption { text-align: center; color: var(--muted); font-size: 0.9rem; margin-top: 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+.card h3 { margin: 0 0 4px; font-size: 1rem; }
+.card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.bars { display: grid; gap: 10px; margin-top: 12px; }
+.bars div { display: grid; grid-template-columns: 9em 1fr; gap: 12px; align-items: center; }
+.bars img { width: 100%; max-width: 380px; border-radius: 6px; }
+.bars span { color: var(--muted); font-size: 0.9rem; }
+table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 0.95rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+footer { color: var(--muted); font-size: 0.85rem; padding-top: 48px; padding-bottom: 32px; }
+.policy h2 { font-size: 1.15rem; margin-top: 32px; }
+.policy li { margin-bottom: 6px; }
+@media (max-width: 520px) {
+  h1 { font-size: 1.9rem; }
+  .bars div { grid-template-columns: 1fr; gap: 4px; }
+}

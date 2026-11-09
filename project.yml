@@ -13,8 +13,8 @@ settings:
     # Optimized even in Debug: the decoder's per-word loops run ~5x slower
     # unoptimized, which made typing feel laggy.
     SWIFT_OPTIMIZATION_LEVEL: "-O"
-    MARKETING_VERSION: "0.11.2"
-    CURRENT_PROJECT_VERSION: "74"
+    MARKETING_VERSION: "0.12.0"
+    CURRENT_PROJECT_VERSION: "81"
 packages:
   # azooKey's kana-kanji converter (MIT) with its default dictionary.
   AzooKeyKanaKanjiConverter:
@@ -75,6 +75,9 @@ targets:
       # Word list for English, French, German and Spanish.
       # Gemma is no longer bundled: the app downloads it on request (Shared/ModelStore.swift).
       - path: Models/lexicon-enfrdees.bin
+        buildPhase: resources
+      # Korean words for the Hangul keyboards' completions (FrequencyWords, OpenSubtitles 2018).
+      - path: Models/words-ko.txt
         buildPhase: resources
       # Small candidate rankers: dense head and mixture-of-experts head.
       - path: Models/ranker-dense.rank

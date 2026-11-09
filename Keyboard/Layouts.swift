@@ -19,7 +19,7 @@ enum KeyAction: Hashable {
 enum MenuAction: Hashable {
     case emoji, settings, oneHanded
     case layout(LetterLayout)
-    case kana, romaji
+    case kana, romaji, hangul
 
     /// Shown as text when set, otherwise `symbol` is drawn as an icon.
     var title: String? {
@@ -27,6 +27,7 @@ enum MenuAction: Hashable {
         case .layout(let layout): return layout.name
         case .kana: return "かな"
         case .romaji: return "ローマ字"
+        case .hangul: return "한국어"
         case .settings: return "Keyboard Settings…"
         default: return nil
         }
@@ -37,7 +38,7 @@ enum MenuAction: Hashable {
         case .emoji: return "face.smiling"
         case .settings: return "gearshape"
         case .oneHanded: return "keyboard.onehanded.right"
-        case .layout, .kana, .romaji: return "keyboard"
+        case .layout, .kana, .romaji, .hangul: return "keyboard"
         }
     }
 }
@@ -162,7 +163,7 @@ enum Layouts {
         ]
         if showGlobe { bottom.append(.key(Key(action: .globe))) }
         bottom += [
-            .key(Key(action: .language, hint: romaji ? "A" : settings.japaneseInput == .off ? nil : "あ",
+            .key(Key(action: .language, hint: romaji ? "A" : settings.asianLanguage.keyHint,
                      alwaysShowHint: true)),
             .key(Key(action: .text(","), hintIcon: "face.smiling", actions: [.emoji, .oneHanded])),
             .key(Key(action: .space, units: 10 - fixed)),
@@ -179,6 +180,65 @@ enum Layouts {
             bottom,
         ]
         return result
+    }
+
+    /// Dubeolsik Hangul, like the iOS Korean keyboard: consonants on the
+    /// left, vowels on the right; shift gives ㄲ ㄸ ㅃ ㅆ ㅉ ㅒ ㅖ (also on
+    /// long-press). ⚙ leads back to Latin.
+    static func hangul(_ settings: KeyboardSettings, showGlobe: Bool) -> [[RowItem]] {
+        let rows = ["ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ", "ㅁㄴㅇㄹㅎㅗㅓㅏㅣ", "ㅋㅌㅊㅍㅠㅜㅡ"]
+        func keys(_ row: Int, units: CGFloat = 1) -> [RowItem] {
+            rows[row].map { c in
+                let jamo = String(c)
+                let tense = HangulComposer.shifted[jamo]
+                // Phonetic overlay: the key's sound in the corner, always shown.
+                if settings.hangulRomaja {
+                    return .key(Key(action: .text(jamo), hint: Romaja.letter(for: c), alwaysShowHint: true,
+                                    alternates: tense.map { [$0] } ?? [], units: units))
+                }
+                return .key(Key(action: .text(jamo), hint: tense, alternates: tense.map { [$0] } ?? [], units: units))
+            }
+        }
+        let fixed: CGFloat = 1.25 + 1 + 1 + 1 + 1.75 + (showGlobe ? 1 : 0)
+        var bottom: [RowItem] = [.key(Key(action: .toNumpad, units: 1.25))]
+        if showGlobe { bottom.append(.key(Key(action: .globe))) }
+        bottom += [
+            .key(Key(action: .language, hint: "A", alwaysShowHint: true)),
+            .key(Key(action: .text(","), hintIcon: "face.smiling", actions: [.emoji, .oneHanded])),
+            .key(Key(action: .space, units: 10 - fixed)),
+            .key(Key(action: .text("."), hint: "?", alternates: ["?", "!", "…", "/"])),
+            .key(Key(action: .returnKey, units: 1.75)),
+        ]
+        var result: [[RowItem]] = []
+        if settings.numberRow { result.append(numberRow.map { .key($0) }) }
+        result += [
+            keys(0),
+            [.gap(0.5)] + keys(1) + [.gap(0.5)],
+            [.key(Key(action: .shift, units: 1.5))] + keys(2) + [.key(Key(action: .backspace, units: 1.5))],
+            bottom,
+        ]
+        return result
+    }
+
+    /// Cheonjiin (천지인), the 12-key Hangul pad: ㅣ ㆍ ㅡ build the vowels,
+    /// each consonant key cycles on repeated taps (ㄱ → ㅋ → ㄲ); → separates
+    /// two taps of the same key. Same frame as the kana pad.
+    static func cheonjiin(_ settings: KeyboardSettings, showGlobe: Bool) -> [[RowItem]] {
+        /// With the phonetic overlay, each key's sounds in the corner (ㄱㅋ → g k).
+        func p(_ label: String) -> RowItem {
+            let sounds = settings.hangulRomaja && label != Cheonjiin.punctuationKey && label != "ㆍ"
+                ? label.compactMap { Romaja.letter(for: $0) }.joined(separator: " ") : nil
+            return .key(Key(action: .text(label), hint: sounds, alwaysShowHint: sounds != nil, units: 2))
+        }
+        func k(_ action: KeyAction, hint: String? = nil, units: CGFloat = 2) -> RowItem {
+            .key(Key(action: action, hint: hint, alwaysShowHint: true, units: units))
+        }
+        return [
+            [k(showGlobe ? .globe : .cursor(-1)), p("ㅣ"), p("ㆍ"), p("ㅡ"), k(.backspace)],
+            [k(.toNumpad), p("ㄱㅋ"), p("ㄴㄹ"), p("ㄷㅌ"), k(.cursor(1))],
+            [k(.emoji), p("ㅂㅍ"), p("ㅅㅎ"), p("ㅈㅊ"), k(.space)],
+            [k(.language, hint: "A"), p(Cheonjiin.punctuationKey), p("ㅇㅁ"), k(.returnKey, units: 4)],
+        ]
     }
 
     /// Japanese 12-key flick pad, like the iPhone's: tap a kana for its

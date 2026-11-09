@@ -4,10 +4,12 @@ import UIKit
 
 /// `romaji`: the Latin layout typing Japanese ("nihongo" → にほんご → 日本語).
 enum KeyboardMode: String {
-    case letters, kana, romaji, numpad, emoji
+    case letters, kana, romaji, hangul, numpad, emoji
     /// Numbers on top, punctuation below; `symbols2` is the "#+=" page.
     case symbols, symbols2
     var isJapanese: Bool { self == .kana || self == .romaji }
+    /// A keyboard for the Asian language: no capitals, no Latin autocorrect.
+    var isAsian: Bool { isJapanese || self == .hangul }
 }
 enum ShiftState { case off, on, locked }
 
@@ -57,10 +59,31 @@ final class KeyboardState: ObservableObject {
 
     /// The Japanese keyboard picked in the app: kana flick or romaji.
     var japaneseMode: KeyboardMode { settings.japaneseInput == .romaji ? .romaji : .kana }
-    var japaneseOn: Bool { settings.japaneseInput != .off }
+    /// The Asian language's keyboard, or nil with none picked.
+    var asianMode: KeyboardMode? {
+        switch settings.asianLanguage {
+        case .none: return nil
+        case .japanese: return japaneseMode
+        case .korean: return .hangul
+        }
+    }
+    /// Romaji in the ABC keyboard offers Japanese.
+    var japaneseInABC: Bool { settings.asianLanguage == .japanese && settings.japaneseInLatin }
+    /// Romaja in the ABC keyboard offers Korean.
+    var koreanInABC: Bool { settings.asianLanguage == .korean && settings.koreanInLatin }
+
+    /// The Hangul syllable being built (Dubeolsik), or the Cheonjiin pad.
+    private var hangul = HangulComposer()
+    private var cheonjiin = Cheonjiin()
+    private var usesCheonjiin: Bool { settings.koreanInput == .cheonjiin }
+    /// Text the block put in the document: when the text before the cursor no
+    /// longer ends with it (the cursor moved, the app changed it), it's done.
+    private var hangulText = ""
 
     func switchTo(_ text: KeyboardMode) {
         commitComposition()
+        hangul.reset()
+        cheonjiin.reset()
         if text != .letters { shift = .off }
         textMode = text
         mode = text
@@ -76,13 +99,47 @@ final class KeyboardState: ObservableObject {
         if textMode.isJapanese {
             predictor.unload()
             KanaConverter.shared.load()
+        } else if textMode == .hangul {
+            // Korean: word completions only (no prediction model yet).
+            predictor.unload()
+            KanaConverter.shared.unload()
+            DispatchQueue.global(qos: .userInitiated).async {
+                KoreanWords.shared.load()
+                DispatchQueue.main.async { [weak self] in self?.textChanged() }
+            }
         } else {
-            if settings.japaneseInLatin { KanaConverter.shared.load() } else { KanaConverter.shared.unload() }
+            if !koreanInABC { KoreanWords.shared.unload() }
+            if japaneseInABC { KanaConverter.shared.load() } else { KanaConverter.shared.unload() }
+            if koreanInABC {
+                DispatchQueue.global(qos: .userInitiated).async { KoreanWords.shared.load() }
+            }
             Suggester.languages = settings.predictionLanguages
             predictor.setLanguages(settings.predictionLanguages)
             predictor.setModel(settings.correctionModel)
             predictor.load()
         }
+    }
+
+    // MARK: Hangul
+
+    private func typeHangul(_ jamo: Character) {
+        var j = jamo
+        if shift != .off, let tense = HangulComposer.shifted[String(jamo)]?.first { j = tense }
+        if shift == .on { shift = .off }
+        // The block is only ours while the text still ends with it.
+        if !hangul.isEmpty && !textBefore.hasSuffix(hangulText) { hangul.reset() }
+        applyHangul([hangul.type(j)], text: hangul.text)
+    }
+
+    /// Makes the edits, then remembers `text` as the Hangul now ending the document.
+    private func applyHangul(_ edits: [(delete: Int, insert: String)], text: String) {
+        for edit in edits {
+            for _ in 0..<edit.delete { proxy?.deleteBackward() }
+            if !edit.insert.isEmpty { proxy?.insertText(edit.insert) }
+        }
+        hangulText = text
+        lastCorrection = nil
+        textChanged()
     }
 
     // MARK: Kana composition
@@ -212,9 +269,7 @@ final class KeyboardState: ObservableObject {
     @Published var settings = KeyboardSettings.load() {
         // The app switched the Japanese keyboard while the other one was up.
         didSet {
-            if textMode.isJapanese && (!japaneseOn || textMode != japaneseMode) {
-                switchTo(japaneseOn ? japaneseMode : .letters)
-            }
+            if textMode.isAsian && textMode != asianMode { switchTo(asianMode ?? .letters) }
         }
     }
     /// Emoji search in progress: letters, space and delete edit this instead
@@ -300,6 +355,7 @@ final class KeyboardState: ObservableObject {
 
     func display(_ s: String) -> String {
         guard shift != .off else { return s }
+        if mode == .hangul { return HangulComposer.shifted[s] ?? s }
         let upper = s.uppercased()
         // "ß".uppercased() is "SS"; keep single characters single.
         return upper.count == s.count ? upper : s
@@ -445,6 +501,18 @@ final class KeyboardState: ObservableObject {
             deleteComposing()
             return
         }
+        if mode == .hangul, usesCheonjiin, !cheonjiin.isEmpty, textBefore.hasSuffix(hangulText),
+           let edit = cheonjiin.backspace() {
+            applyHangul([edit], text: cheonjiin.text)
+            return
+        }
+        if mode == .hangul, !usesCheonjiin, !hangul.isEmpty, textBefore.hasSuffix(hangulText),
+           let edit = hangul.backspace() {
+            applyHangul([edit], text: hangul.text)
+            return
+        }
+        hangul.reset()
+        cheonjiin.reset()
         if !taps.isEmpty { taps.removeLast() }
         if let late = lateFix {
             // Deleting into the finished word means it's being edited by hand.
@@ -549,11 +617,21 @@ final class KeyboardState: ObservableObject {
 
     /// Kanji/kana for the romaji word being typed ("watashi" → 私).
     @Published private(set) var japaneseChip: Candidate?
+    /// Hangul for the romaja word being typed ("annyeong" → 안녕).
+    @Published private(set) var koreanChip: String?
+    /// What the red chip shows, Japanese or Korean.
+    var chipText: String? { japaneseChip?.text ?? koreanChip }
     /// First in the bar when the word isn't English or French, else last.
     @Published private(set) var japaneseChipFirst = false
 
+    private func refreshKoreanChip(_ word: String) {
+        let found = koreanInABC ? KoreanWords.shared.fromRomaja(word) : nil
+        if found != koreanChip { koreanChip = found }
+        if found != nil { japaneseChipFirst = !Suggester.isWord(word) }
+    }
+
     private func refreshJapaneseChip(_ word: String) {
-        guard settings.japaneseInLatin, let reading = Self.romajiReading(word) else {
+        guard japaneseInABC, let reading = Self.romajiReading(word) else {
             if japaneseChip != nil { japaneseChip = nil }
             return
         }
@@ -586,6 +664,15 @@ final class KeyboardState: ObservableObject {
     /// Swaps the romaji word for the chip's kanji. No space after: Japanese
     /// doesn't use them.
     func pickJapanese() {
+        if japaneseChip == nil, let korean = koreanChip {
+            // Korean uses spaces between words, like a picked suggestion.
+            lateFix = nil
+            taps = []
+            koreanChip = nil
+            for _ in 0..<currentWord.count { proxy?.deleteBackward() }
+            insert(korean + " ")
+            return
+        }
         guard let candidate = japaneseChip else { return }
         lateFix = nil
         taps = []
@@ -596,6 +683,15 @@ final class KeyboardState: ObservableObject {
     }
 
     func pick(suggestion: String) {
+        if mode == .hangul {
+            // A completion replaces the Hangul word being typed.
+            let word = hangulWord
+            hangul.reset()
+            cheonjiin.reset()
+            for _ in 0..<word.count { proxy?.deleteBackward() }
+            insert(suggestion + " ")
+            return
+        }
         // Picking the word exactly as typed over a pending fix: keep it.
         if pendingCorrection != nil, suggestion == currentWord { learn(suggestion) }
         lateFix = nil
@@ -630,6 +726,31 @@ final class KeyboardState: ObservableObject {
                 break   // shift, number pages, globe: as usual
             }
         }
+        if mode == .hangul && usesCheonjiin {
+            switch key.action {
+            case .text(let s) where Cheonjiin.handles(s):
+                if !cheonjiin.isEmpty && !textBefore.hasSuffix(hangulText) { cheonjiin.reset() }
+                applyHangul(cheonjiin.tap(s), text: cheonjiin.text)
+                return
+            case .cursor(1) where cheonjiin.inUnit:
+                cheonjiin.endUnit()  // → between two taps of the same key: ㄱ, ㄱ
+                return
+            case .backspace:
+                break
+            default:
+                cheonjiin.reset()
+            }
+        } else if mode == .hangul {
+            switch key.action {
+            case .text(let s) where s.count == 1 && HangulComposer.isJamo(s.first!):
+                typeHangul(s.first!)
+                return
+            case .backspace, .shift:
+                break
+            default:
+                hangul.reset()  // punctuation, space, other keys end the syllable
+            }
+        }
         switch key.action {
         case .text(let s) where mode == .kana:
             compose(s)
@@ -660,10 +781,10 @@ final class KeyboardState: ObservableObject {
         case .toLetters: mode = textMode
         case .globe: controller?.advanceToNextInputMode()
         case .language:
-            if mode.isJapanese {
+            if mode.isAsian {
                 switchTo(.letters)
-            } else if japaneseOn {
-                switchTo(japaneseMode)
+            } else if let asian = asianMode {
+                switchTo(asian)
             } else if let i = settings.menuLayouts.firstIndex(of: settings.layout), settings.menuLayouts.count > 1 {
                 // No Japanese: a tap goes to the next layout in the menu.
                 settings.layout = settings.menuLayouts[(i + 1) % settings.menuLayouts.count]
@@ -703,8 +824,9 @@ final class KeyboardState: ObservableObject {
     /// slides up to pick; the keyboard in use has a checkmark.
     func showKeyboardMenu(over key: CGRect) {
         let options: [MenuAction] = [.settings] + settings.menuLayouts.map { .layout($0) }
-            + (japaneseOn ? [japaneseMode == .romaji ? .romaji : .kana] : [])
-        let current: MenuAction = textMode == .kana ? .kana : textMode == .romaji ? .romaji : .layout(settings.layout)
+            + (asianMode.map { [$0 == .romaji ? .romaji : $0 == .hangul ? .hangul : .kana] } ?? [])
+        let current: MenuAction = textMode == .kana ? .kana : textMode == .romaji ? .romaji
+            : textMode == .hangul ? .hangul : .layout(settings.layout)
         let checked = options.firstIndex(of: current)
         showPopup(options: options.map(PopupItem.action), over: key, cellWidth: 220,
                   selected: checked ?? 0, vertical: true, menu: true, checked: checked)
@@ -775,7 +897,10 @@ final class KeyboardState: ObservableObject {
         guard let p = popup else { return }
         popup = nil
         switch p.options[p.selected] {
+        case .text(let s) where mode == .hangul && s.count == 1 && HangulComposer.isJamo(s.first!):
+            typeHangul(s.first!)   // ㄲ ㅃ… from a long-press join the syllable too
         case .text(let s):
+            if mode == .hangul { hangul.reset() }
             if s.count == 1, let letter = s.lowercased().first, letter.isLetter || letter == "'" {
                 taps.append(Self.tap(letter, at: nil))
             }
@@ -792,6 +917,7 @@ final class KeyboardState: ObservableObject {
             switchTo(.letters)
         case .action(.kana): switchTo(.kana)
         case .action(.romaji): switchTo(.romaji)
+        case .action(.hangul): switchTo(.hangul)
         }
     }
 
@@ -883,6 +1009,13 @@ final class KeyboardState: ObservableObject {
         DispatchQueue.main.async(execute: work)
     }
 
+    /// Hangul just before the cursor: the word the Korean bar completes.
+    private var hangulWord: String {
+        String(textBefore.reversed().prefix { c in
+            c.unicodeScalars.allSatisfy { (0xAC00...0xD7A3).contains($0.value) || (0x3131...0x318E).contains($0.value) }
+        }.reversed())
+    }
+
     private func refreshBar() {
         let started = CACurrentMediaTime()
         // Keyboards may only read the clipboard with Full Access. `hasStrings`
@@ -893,12 +1026,20 @@ final class KeyboardState: ObservableObject {
             let pasteAvailable = controller?.hasFullAccess == true && UIPasteboard.general.hasStrings
             if pasteAvailable != canPaste { canPaste = pasteAvailable }
         }
+        if mode == .hangul {
+            let completions = KoreanWords.shared.complete(hangulWord)
+            if completions != suggestions { suggestions = completions }
+            if pendingCorrection != nil { pendingCorrection = nil }
+            return
+        }
         guard mode == .letters else {
             if japaneseChip != nil { japaneseChip = nil }
+            if koreanChip != nil { koreanChip = nil }
             return
         }
         let word = currentWord
         refreshJapaneseChip(word)
+        refreshKoreanChip(word)
         guard predictor.isReady else {
             // Model still loading: the plain dictionary bar.
             let fix = correction(for: word)
@@ -931,8 +1072,8 @@ final class KeyboardState: ObservableObject {
 
     private func updateAutoShift() {
         guard shift != .locked, let proxy else { return }
-        // Japanese has no capitals.
-        guard !mode.isJapanese else {
+        // Japanese and Korean have no capitals (Hangul's shift is for ㄲ ㅃ…).
+        guard !mode.isAsian else {
             if shift != .off { shift = .off }
             return
         }

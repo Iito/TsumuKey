@@ -40,8 +40,9 @@ struct ContentView: View {
                 }
 
                 Section {
-                    row("Layouts", "keyboard", .blue, settings.menuLayouts.map(\.name).joined(separator: ", ")) { layoutsPage }
-                    row("Languages & Model", "globe", .indigo, (settings.predictionLanguages.map(\.name) + ["日本語"]).joined(separator: ", ")) { modelPage }
+                    row("Layouts", "keyboard", .blue, settings.menuLayouts.map(\.name).joined(separator: ", ")
+                        + (settings.asianLanguage == .none ? "" : " · " + settings.asianLanguage.name)) { layoutsPage }
+                    row("Languages & Model", "globe", .indigo, settings.predictionLanguages.map(\.name).joined(separator: ", ")) { modelPage }
                 }
                 Section {
                     row("Typing", "character.cursor.ibeam", .gray, typingSummary) { typingPage }
@@ -148,6 +149,8 @@ struct OrderedListPage<Item: Identifiable & Hashable>: View {
     let info: [String]
     /// Optional picture of an item (a layout's keys), shown when its row is held.
     var preview: ((Item) -> AnyView)? = nil
+    /// Shown after the list (the Layouts page's other alphabet).
+    var extraSection: AnyView? = nil
 
     private var rest: [Item] { all.filter { !items.contains($0) } }
 
@@ -212,6 +215,7 @@ struct OrderedListPage<Item: Identifiable & Hashable>: View {
                 }
             }
 
+            if let extraSection { extraSection }
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
@@ -365,29 +369,50 @@ extension ContentView {
                         info: ["Up to \(KeyboardSettings.maxMenuLayouts) layouts. The first one is the default: the keyboard opens on it.",
                                "Hold the ⚙︎ key on the keyboard to switch between them. The Japanese keyboard is always in that menu too.",
                                "Hold a layout here to see its keys."],
-                        preview: { AnyView(LayoutPreview(layout: $0)) })
+                        preview: { AnyView(LayoutPreview(layout: $0)) },
+                        extraSection: AnyView(otherAlphabetSection))
             .onChange(of: settings.menuLayouts) { _, list in
                 // The keyboard opens on the top layout.
                 if let first = list.first, first != settings.layout { settings.layout = first }
             }
     }
 
-    /// Prediction languages and model, then Japanese, which is always on
-    /// next to them (its own dictionary, not the prediction model).
     private var modelPage: some View {
-        Form {
-            ModelsSection(settings: $settings)
-            Section {
+        Form { ModelsSection(settings: $settings) }
+    }
+
+    /// Layouts page, second part: the one keyboard for another alphabet
+    /// (kana, Hangul) next to the Latin layouts.
+    private var otherAlphabetSection: some View {
+        Section {
+            Picker("Other alphabet", selection: $settings.asianLanguage) {
+                ForEach(AsianLanguage.allCases) { Text($0.name).tag($0) }
+            }
+            switch settings.asianLanguage {
+            case .japanese:
                 Picker("Japanese keyboard", selection: $settings.japaneseInput) {
                     ForEach(JapaneseInput.allCases) { Text($0.name).tag($0) }
                 }
                 Toggle("Japanese in ABC", isOn: $settings.japaneseInLatin)
-            } header: {
-                InfoHeader("Japanese", info: [
-                    "Japanese keyboard: かな is the flick pad; ローマ字 types romaji on the letter keys. Off leaves Japanese out of the keyboard menu; a tap on the ⚙︎ key then switches layouts.",
-                    "Japanese in ABC: typing romaji (watashi, arigatou) offers 私, ありがとう in the bar; tap it to swap.",
-                ])
+            case .korean:
+                Picker("Korean keyboard", selection: $settings.koreanInput) {
+                    ForEach(KoreanInput.allCases) { Text($0.name).tag($0) }
+                }
+                Toggle("Korean in ABC", isOn: $settings.koreanInLatin)
+                Toggle("Romaja on keys", isOn: $settings.hangulRomaja)
+            case .none:
+                EmptyView()
             }
+        } header: {
+            InfoHeader("Other Alphabets", info: [
+                "One language with its own alphabet, next to your prediction languages. Its keyboard is in the ⚙︎ menu, and a tap on ⚙︎ switches to it.",
+                "Japanese keyboard: かな is the flick pad; ローマ字 types romaji on the letter keys.",
+                "Japanese in ABC: typing romaji (watashi, arigatou) offers 私, ありがとう in the bar; tap it to swap.",
+                "Korean: 두벌식 (Dubeolsik), the standard Hangul layout; shift or long-press for ㄲ ㄸ ㅃ ㅆ ㅉ ㅒ ㅖ. 천지인 (Cheonjiin), the 12-key pad: ㅣ ㆍ ㅡ build the vowels, tap a consonant again for the next one (ㄱ → ㅋ → ㄲ), and → to type the same consonant twice.",
+                "Korean in ABC: typing romanised Korean (annyeong, gamsahamnida) offers 안녕, 감사합니다 in the bar; tap it to swap.",
+                "Romaja on keys: each Hangul key shows its sound (ㄱ g, ㅓ eo), for learning the layout.",
+                "None: the ⚙︎ key switches between your layouts instead.",
+            ])
         }
     }
 

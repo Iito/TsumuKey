@@ -145,6 +145,14 @@ struct KeyboardSettings: Codable, Equatable {
     var japaneseInLatin = true
     /// The Japanese keyboard: the あ key and the ⚙︎ menu switch to this one.
     var japaneseInput: JapaneseInput = .kana
+    /// The one Asian language next to the European ones: its keyboard is in
+    /// the menu, and (Japanese) romaji in the ABC keyboard offers it.
+    var asianLanguage: AsianLanguage = .japanese
+    var koreanInput: KoreanInput = .dubeolsik
+    /// Romanised Korean in the ABC keyboard offers the Hangul (annyeong → 안녕).
+    var koreanInLatin = true
+    /// Romaja under each Hangul key (ㄱ g, ㅏ a), for learners.
+    var hangulRomaja = false
     /// Layouts listed when the settings key is held (1 to 3, in this order).
     /// The first is the default; `layout` is the one in use right now.
     var menuLayouts: [LetterLayout] = [.qwerty, .colemak, .azerty]
@@ -187,7 +195,14 @@ struct KeyboardSettings: Codable, Equatable {
         numberKeyTap = try c.decodeIfPresent(NumberKeyTap.self, forKey: .numberKeyTap) ?? d.numberKeyTap
         letterColors = try c.decodeIfPresent(LetterColors.self, forKey: .letterColors) ?? d.letterColors
         japaneseInLatin = try c.decodeIfPresent(Bool.self, forKey: .japaneseInLatin) ?? d.japaneseInLatin
-        japaneseInput = try c.decodeIfPresent(JapaneseInput.self, forKey: .japaneseInput) ?? d.japaneseInput
+        // Build 74 had "off" here; it's now Asian language "none".
+        let japanese = try c.decodeIfPresent(String.self, forKey: .japaneseInput)
+        japaneseInput = japanese.flatMap(JapaneseInput.init) ?? d.japaneseInput
+        asianLanguage = try c.decodeIfPresent(AsianLanguage.self, forKey: .asianLanguage)
+            ?? (japanese == "off" ? AsianLanguage.none : d.asianLanguage)
+        koreanInput = try c.decodeIfPresent(KoreanInput.self, forKey: .koreanInput) ?? d.koreanInput
+        koreanInLatin = try c.decodeIfPresent(Bool.self, forKey: .koreanInLatin) ?? d.koreanInLatin
+        hangulRomaja = try c.decodeIfPresent(Bool.self, forKey: .hangulRomaja) ?? d.hangulRomaja
         // Settings from before the list: the layout in use goes on top.
         let menu = try c.decodeIfPresent([LetterLayout].self, forKey: .menuLayouts)
             ?? [layout] + d.menuLayouts.filter { $0 != layout }
@@ -242,17 +257,41 @@ enum CorrectionModel: String, Codable, CaseIterable, Identifiable {
 }
 
 enum JapaneseInput: String, Codable, CaseIterable, Identifiable {
-    /// Off: no Japanese keyboard in the menu, and the language key cycles the layouts.
-    case kana, romaji, off
+    case kana, romaji
+
+    var id: Self { self }
+    var name: String { self == .kana ? "かな" : "ローマ字" }
+}
+
+/// "Other alphabet" in the app: one language with its own script (Japanese,
+/// Korean), paired with the European prediction languages. None: the
+/// language key cycles the layouts instead.
+enum AsianLanguage: String, Codable, CaseIterable, Identifiable {
+    case none, japanese, korean
 
     var id: Self { self }
     var name: String {
         switch self {
-        case .kana: return "かな"
-        case .romaji: return "ローマ字"
-        case .off: return "Off"
+        case .none: return "None"
+        case .japanese: return "日本語"
+        case .korean: return "한국어"
         }
     }
+    /// Corner hint on the ABC keyboard's language key.
+    var keyHint: String? {
+        switch self {
+        case .none: return nil
+        case .japanese: return "あ"
+        case .korean: return "한"
+        }
+    }
+}
+
+enum KoreanInput: String, Codable, CaseIterable, Identifiable {
+    case dubeolsik, cheonjiin
+
+    var id: Self { self }
+    var name: String { self == .dubeolsik ? "두벌식" : "천지인" }
 }
 
 enum NumberKeyTap: String, Codable, CaseIterable, Identifiable {
@@ -335,7 +374,8 @@ struct LetterColors: Codable, Equatable {
         vowels = try c.decodeIfPresent(String.self, forKey: .vowels) ?? d.vowels
     }
 
-    static let vowelLetters = "aeiouyàâäéèêëîïôöùûüÿæœ"
+    /// Latin vowels, and the Hangul vowel keys (Dubeolsik's right side).
+    static let vowelLetters = "aeiouyàâäéèêëîïôöùûüÿæœㅏㅐㅑㅒㅓㅔㅕㅖㅗㅛㅜㅠㅡㅣ"
 
     /// nil keeps the theme's colour. `letter`/`spot` are set for letter keys only.
     func hex(letter: Character?, spot: LetterSpot?) -> String? {

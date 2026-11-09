@@ -13,6 +13,59 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.12.0 (build 81), 2026-11-09
+Installed on the iPhone 15.
+- Korean in ABC: romanised Korean typed on the Latin keyboard offers the Hangul in the red
+  chip, like Japanese romaji (annyeong / annyong → 안녕, gamsahamnida / kamsahamnida →
+  감사합니다, saranghae → 사랑해, chingu → 친구, jinjja → 진짜); a tap swaps it and adds a
+  space. Every word of the Korean list is romanised letter by letter and as pronounced,
+  and spelling is matched loosely (g/k, b/p, r/l, eo/o, doubled letters). On by default
+  when Korean is the other alphabet (Layouts → Korean in ABC).
+- Romaja on keys (Layouts, off by default): each Hangul key shows its sound in the corner
+  (ㄱ g, ㅓ eo, ㅇ ng; on Cheonjiin ㄱㅋ g k), for learning the layout.
+
+## 0.12.0 (build 80), 2026-11-09
+Installed on the iPhone 15.
+- Korean completions on both Hangul keyboards: the bar offers the three most common words
+  that start with what you typed (안녕하 → 안녕하세요, 감사 → 감사합니다, 괜 → 괜찮아), matched
+  jamo by jamo so a syllable still being typed counts (안 also finds 아니). A tap replaces
+  the word and adds a space. 40,000 words from OpenSubtitles 2018 (FrequencyWords,
+  CC BY-SA 4.0), loaded only while a Hangul keyboard is up. No next-word prediction yet.
+
+## 0.12.0 (build 79), 2026-11-09
+Installed on the iPhone 15.
+- Other Alphabets moved from Languages & Model to the Layouts page, under the Latin layouts:
+  Other alphabet, its keyboard (かな / ローマ字, 두벌식 / 천지인) and Japanese in ABC. The
+  Layouts row on the main page reads e.g. "QWERTY, Colemak, AZERTY · 한국어"; Languages &
+  Model is back to prediction only.
+
+## 0.12.0 (build 78), 2026-11-09
+Installed on the iPhone 15.
+- Korean keyboard 천지인 (Cheonjiin), the 12-key pad (Languages & Model → Korean keyboard):
+  ㅣ ㆍ ㅡ build every vowel (ㅣㆍ → ㅏ, ㆍㅡ → ㅗ, ㅡㆍㆍ → ㅠ, ㅡㆍㆍㅣ → ㅝ), a consonant key
+  cycles on repeated taps (ㄱ → ㅋ → ㄲ, ㅅ → ㅎ → ㅆ), → separates two taps of the same key
+  (각기), and .,?! cycles the punctuation. Syllables form exactly as on 두벌식.
+
+## 0.12.0 (build 77), 2026-11-09
+Installed on the iPhone 15.
+- Hangul keyboard follows the letter colours like the Latin one: by row, by thumb, all keys,
+  and the vowel colour on the vowel keys (ㅏ ㅓ ㅗ ㅜ ㅡ ㅣ…).
+
+## 0.12.0 (build 76), 2026-11-09
+Installed on the iPhone 15.
+- "Asian Language" is now called "Other Alphabets" in the app (Other alphabet: None, 日本語,
+  한국어).
+
+## 0.12.0 (build 75), 2026-11-09
+Installed on the iPhone 15.
+- Korean keyboard: 두벌식 (Dubeolsik), the standard Hangul layout. Jamo join into syllables
+  as you type (ㅎㅏㄴㄱㅡㄹ → 한글), a final consonant moves on when a vowel follows (값 + ㅣ → 값이), compound vowels (ㅗ + ㅏ → ㅘ); shift or long-press for ㄲ ㄸ ㅃ ㅆ ㅉ ㅒ ㅖ;
+  backspace takes off one jamo at a time. No Korean suggestions yet.
+- Languages & Model → Other Alphabets: None, 日本語 or 한국어, paired with the prediction
+  languages. Its keyboard is in the ⚙︎ menu and a tap on ⚙︎ switches to it (한 on the key for
+  Korean, あ for Japanese). Japanese keeps its かな / ローマ字 choice and Japanese in ABC.
+  Build 74's "Japanese keyboard: Off" becomes Other alphabet: None.
+
 ## 0.11.2 (build 74), 2026-11-09
 Installed on the iPhone 15.
 - Japanese keyboard can be turned off (Languages & Model → Japanese keyboard → Off): かな and

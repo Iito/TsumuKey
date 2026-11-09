@@ -86,6 +86,10 @@ struct KeyboardView: View {
         case .letters: base = Layouts.letters(state.settings, showGlobe: state.showGlobe)
         case .romaji: base = Layouts.letters(state.settings, showGlobe: state.showGlobe, romaji: true)
         case .kana: base = Layouts.kana(showGlobe: state.showGlobe)
+        case .hangul:
+            base = state.settings.koreanInput == .cheonjiin
+                ? Layouts.cheonjiin(state.settings, showGlobe: state.showGlobe)
+                : Layouts.hangul(state.settings, showGlobe: state.showGlobe)
         case .symbols: base = Layouts.symbols(state.settings, page: 1, showGlobe: state.showGlobe)
         case .symbols2: base = Layouts.symbols(state.settings, page: 2, showGlobe: state.showGlobe)
         default: base = Layouts.numpad
@@ -95,7 +99,7 @@ struct KeyboardView: View {
         let unit = width / 10
         let rowHeight = height / CGFloat(base.count)
         let rows = Self.placeLetters(base, numberRow: state.settings.numberRow,
-                                     latin: state.mode == .letters || state.mode == .romaji)
+                                     latin: state.mode == .letters || state.mode == .romaji || state.mode == .hangul)
 
         return VStack(spacing: 0) {
             ForEach(rows.indices, id: \.self) { r in
@@ -106,7 +110,8 @@ struct KeyboardView: View {
                             Color.clear.frame(width: units * unit, height: rowHeight)
                         case .key(let key):
                             let id = "\(r)-\(i)"
-                            KeyView(key: key, state: state, large: state.mode == .kana || state.mode == .numpad,
+                            KeyView(key: key, state: state, large: state.mode == .kana || state.mode == .numpad
+                                         || (state.mode == .hangul && state.settings.koreanInput == .cheonjiin),
                                     pressedID: id)
                                 .frame(width: key.units * unit, height: rowHeight)
                                 .background(GeometryReader { g in
@@ -288,6 +293,8 @@ struct KeyView: View {
             // in romaji mode, which otherwise looks just like Latin.
             if state.mode == .romaji {
                 Text("ローマ字").font(.system(size: 14)).foregroundStyle(.secondary)
+            } else if state.mode == .hangul {
+                Text("스페이스").font(.system(size: 14)).foregroundStyle(.secondary)
             } else if large {
                 Text("space").font(.system(size: 15))
             } else if state.mode == .letters {
@@ -302,7 +309,8 @@ struct KeyView: View {
         case .symbolPage:
             Text(state.mode == .symbols2 ? "123" : "#+=").font(.system(size: 15))
         case .toLetters:
-            Text(state.textMode == .kana ? "かな" : state.textMode == .romaji ? "ローマ字" : "ABC")
+            Text(state.textMode == .kana ? "かな" : state.textMode == .romaji ? "ローマ字"
+                 : state.textMode == .hangul ? "한글" : "ABC")
                 .font(.system(size: 15))
         case .globe:
             Image(systemName: "globe")
@@ -702,12 +710,12 @@ private struct SuggestionBar: View {
             return state.mathResults.enumerated().map { ($0.element.label, $0.element.text, $0.offset == 0, false) }
         }
         var list = items.map { ($0.label, $0.word, $0.isCorrection, false) }
-        guard let chip = state.japaneseChip else { return list }
+        guard let chip = state.chipText else { return list }
         if list.count >= 3 {
             // Never drop the pending fix or the "as typed" word.
             if let i = list.lastIndex(where: { !$0.2 && $0.0 == $0.1 }) { list.remove(at: i) } else { list.removeLast() }
         }
-        let entry = (chip.text, chip.text, false, true)
+        let entry = (chip, chip, false, true)
         if state.japaneseChipFirst && state.pendingCorrection == nil { list.insert(entry, at: 0) } else { list.append(entry) }
         return list
     }

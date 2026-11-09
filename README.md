@@ -128,6 +128,7 @@ See `CHANGELOG.md` for what changed in each build.
 | azooKey's dictionary (inside the converter) | Apache 2.0 |
 | [Gemma 3 270M](https://ai.google.dev/gemma) (downloaded) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) |
 | Word frequencies from [wordfreq](https://github.com/rspeer/wordfreq) (`Models/lexicon-*.bin`) | Apache 2.0 (code); data under CC BY-SA 4.0 |
+| Korean word counts from [FrequencyWords](https://github.com/hermitdave/FrequencyWords) (OpenSubtitles 2018; `Models/words-ko.txt`) | CC BY-SA 4.0 |
 
 ## Licence
 

@@ -13,6 +13,23 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.11.2 (build 74), 2026-11-09
+Installed on the iPhone 15.
+- Japanese keyboard can be turned off (Languages & Model → Japanese keyboard → Off): かな and
+  ローマ字 leave the ⚙︎ menu, the key loses its あ, and a tap on it switches to the next
+  layout in the menu instead. Japanese in ABC is a separate switch and stays as set.
+
+## 0.11.2 (build 73), 2026-11-09
+Installed on the iPhone 15.
+- Settings: Japanese (keyboard choice, Japanese in ABC) moved into Languages & Model, below
+  the prediction languages and model; the main page loses its Japanese row and the Languages
+  & Model summary lists 日本語.
+
+## 0.11.2 (build 72), 2026-11-09
+Installed on the iPhone 15 and the iPhone 16 Pro Max.
+- Next-word suggestions are about 6x faster with the built-in small model (3 ms instead of
+  18 ms per suggestion on a Mac), with the same suggestions (PR #1).
+
 ## 0.11.1 (build 71), 2026-11-09
 Installed on the iPhone 15 and the iPhone 16 Pro Max.
 - Debug code removed before open-sourcing: the keystroke and memory log (touch.log), the

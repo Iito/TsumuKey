@@ -41,12 +41,11 @@ struct ContentView: View {
 
                 Section {
                     row("Layouts", "keyboard", .blue, settings.menuLayouts.map(\.name).joined(separator: ", ")) { layoutsPage }
-                    row("Languages & Model", "globe", .indigo, settings.predictionLanguages.map(\.name).joined(separator: ", ")) { modelPage }
+                    row("Languages & Model", "globe", .indigo, (settings.predictionLanguages.map(\.name) + ["日本語"]).joined(separator: ", ")) { modelPage }
                 }
                 Section {
                     row("Typing", "character.cursor.ibeam", .gray, typingSummary) { typingPage }
                     row("Suggestion Bar", "sparkles", .orange, barSummary) { barPage }
-                    row("Japanese", "character.ja", .red, settings.japaneseInput.name) { japanesePage }
                     row("Keys", "square.grid.3x3", .teal, settings.numberRow ? "Number row" : "No number row") { keysPage }
                     row("Look", "paintpalette", .pink, settings.theme.name) { lookPage }
                     row("Advanced", "gearshape.2", .gray, settings.haptics ? "Haptics \(settings.hapticStyle.name.lowercased())" : "Haptics off") { advancedPageFramed }
@@ -373,8 +372,23 @@ extension ContentView {
             }
     }
 
+    /// Prediction languages and model, then Japanese, which is always on
+    /// next to them (its own dictionary, not the prediction model).
     private var modelPage: some View {
-        Form { ModelsSection(settings: $settings) }
+        Form {
+            ModelsSection(settings: $settings)
+            Section {
+                Picker("Japanese keyboard", selection: $settings.japaneseInput) {
+                    ForEach(JapaneseInput.allCases) { Text($0.name).tag($0) }
+                }
+                Toggle("Japanese in ABC", isOn: $settings.japaneseInLatin)
+            } header: {
+                InfoHeader("Japanese", info: [
+                    "Japanese keyboard: かな is the flick pad; ローマ字 types romaji on the letter keys. Off leaves Japanese out of the keyboard menu; a tap on the ⚙︎ key then switches layouts.",
+                    "Japanese in ABC: typing romaji (watashi, arigatou) offers 私, ありがとう in the bar; tap it to swap.",
+                ])
+            }
+        }
     }
 
     private var typingPage: some View {
@@ -416,22 +430,6 @@ extension ContentView {
                 } else if settings.currencyConversion {
                     Text("No rates yet: they download when you're online.")
                 }
-            }
-        }
-    }
-
-    private var japanesePage: some View {
-        Form {
-            Section {
-                Picker("Japanese keyboard", selection: $settings.japaneseInput) {
-                    ForEach(JapaneseInput.allCases) { Text($0.name).tag($0) }
-                }
-                Toggle("Japanese in ABC", isOn: $settings.japaneseInLatin)
-            } header: {
-                InfoHeader("Japanese", info: [
-                    "Japanese keyboard: かな is the flick pad; ローマ字 types romaji on the letter keys.",
-                    "Japanese in ABC: typing romaji (watashi, arigatou) offers 私, ありがとう in the bar; tap it to swap.",
-                ])
             }
         }
     }

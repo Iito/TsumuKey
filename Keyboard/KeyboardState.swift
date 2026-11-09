@@ -57,6 +57,7 @@ final class KeyboardState: ObservableObject {
 
     /// The Japanese keyboard picked in the app: kana flick or romaji.
     var japaneseMode: KeyboardMode { settings.japaneseInput == .romaji ? .romaji : .kana }
+    var japaneseOn: Bool { settings.japaneseInput != .off }
 
     func switchTo(_ text: KeyboardMode) {
         commitComposition()
@@ -210,7 +211,11 @@ final class KeyboardState: ObservableObject {
     @Published var showGlobe = false
     @Published var settings = KeyboardSettings.load() {
         // The app switched the Japanese keyboard while the other one was up.
-        didSet { if textMode.isJapanese && textMode != japaneseMode { switchTo(japaneseMode) } }
+        didSet {
+            if textMode.isJapanese && (!japaneseOn || textMode != japaneseMode) {
+                switchTo(japaneseOn ? japaneseMode : .letters)
+            }
+        }
     }
     /// Emoji search in progress: letters, space and delete edit this instead
     /// of the document; the suggestion bar shows the query and the matches.
@@ -654,7 +659,17 @@ final class KeyboardState: ObservableObject {
             mode = mode == .symbols ? .symbols2 : .symbols
         case .toLetters: mode = textMode
         case .globe: controller?.advanceToNextInputMode()
-        case .language: switchTo(mode.isJapanese ? .letters : japaneseMode)
+        case .language:
+            if mode.isJapanese {
+                switchTo(.letters)
+            } else if japaneseOn {
+                switchTo(japaneseMode)
+            } else if let i = settings.menuLayouts.firstIndex(of: settings.layout), settings.menuLayouts.count > 1 {
+                // No Japanese: a tap goes to the next layout in the menu.
+                settings.layout = settings.menuLayouts[(i + 1) % settings.menuLayouts.count]
+                settings.save()
+                switchTo(.letters)
+            }
         case .emoji:
             commitComposition()
             mode = .emoji
@@ -688,7 +703,7 @@ final class KeyboardState: ObservableObject {
     /// slides up to pick; the keyboard in use has a checkmark.
     func showKeyboardMenu(over key: CGRect) {
         let options: [MenuAction] = [.settings] + settings.menuLayouts.map { .layout($0) }
-            + [japaneseMode == .romaji ? .romaji : .kana]
+            + (japaneseOn ? [japaneseMode == .romaji ? .romaji : .kana] : [])
         let current: MenuAction = textMode == .kana ? .kana : textMode == .romaji ? .romaji : .layout(settings.layout)
         let checked = options.firstIndex(of: current)
         showPopup(options: options.map(PopupItem.action), over: key, cellWidth: 220,

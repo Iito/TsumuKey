@@ -162,7 +162,8 @@ enum Layouts {
         ]
         if showGlobe { bottom.append(.key(Key(action: .globe))) }
         bottom += [
-            .key(Key(action: .language, hint: romaji ? "A" : "あ", alwaysShowHint: true)),
+            .key(Key(action: .language, hint: romaji ? "A" : settings.japaneseInput == .off ? nil : "あ",
+                     alwaysShowHint: true)),
             .key(Key(action: .text(","), hintIcon: "face.smiling", actions: [.emoji, .oneHanded])),
             .key(Key(action: .space, units: 10 - fixed)),
             .key(Key(action: .text("."), hint: "?", alternates: ["?", "!", "…", "/"])),

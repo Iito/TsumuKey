@@ -60,15 +60,16 @@ under your finger, accents next to it.
 
 ## Scores
 
-### Typing accuracy against Gboard
+### Typing accuracy against the iOS keyboard
 
-Same simulated taps (noise measured from real taps on the phone) typed on Gboard
-and on this keyboard, Colemak, iPhone 15, 70 English, French and mixed sentences.
+The same simulated taps, typed back to back on the iOS keyboard (English & French)
+and on TsumuKey (QWERTY, iPhone 16 Pro Max, 70 English, French and mixed sentences,
+606 words).
 
-| Typing | Gboard | TsumuKey |
+| Typing | iOS keyboard | TsumuKey |
 |---|---|---|
-| Careful | 85.5% words right | **90.6%** |
-| Fast | 65.3% | **66.7%** |
+| Careful | 92.1% words right | **95.0%** |
+| Fast | 75.9% | **77.9%** |
 
 ### On the phone
 

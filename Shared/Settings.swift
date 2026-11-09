@@ -242,10 +242,17 @@ enum CorrectionModel: String, Codable, CaseIterable, Identifiable {
 }
 
 enum JapaneseInput: String, Codable, CaseIterable, Identifiable {
-    case kana, romaji
+    /// Off: no Japanese keyboard in the menu, and the language key cycles the layouts.
+    case kana, romaji, off
 
     var id: Self { self }
-    var name: String { self == .kana ? "かな" : "ローマ字" }
+    var name: String {
+        switch self {
+        case .kana: return "かな"
+        case .romaji: return "ローマ字"
+        case .off: return "Off"
+        }
+    }
 }
 
 enum NumberKeyTap: String, Codable, CaseIterable, Identifiable {

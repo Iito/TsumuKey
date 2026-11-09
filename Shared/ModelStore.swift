@@ -64,7 +64,7 @@ enum ModelStore {
         return bundled.map { ($0, bundledRankerRound) } ?? downloaded
     }
 
-    /// Shape of a .rank file, read from its header (export.py, TKR3).
+    /// Shape of a .rank file, read from its header (TKR3).
     struct RankerInfo {
         let layers, heads, dim, experts, params: Int
         /// "Transformer 2L × 4H, 4.3M params" (plus experts for a MoE head).
@@ -74,7 +74,7 @@ enum ModelStore {
         }
     }
 
-    /// Attention heads per layer: fixed by train.py's Block(d, 4) and Ranker.swift.
+    /// Attention heads per layer, fixed for every .rank file (see Ranker.swift).
     static let rankerHeads = 4
 
     static func rankerInfo(_ url: URL) -> RankerInfo? {
@@ -85,7 +85,7 @@ enum ModelStore {
         let v = (0..<11).map { i in Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4 + i * 4, as: UInt32.self) }) }
         let (buckets, d, layers, hidden, experts, ctx) = (v[0], v[1], v[2], v[3], v[4], v[5])
         let shared = v[8] == 1, eh = v[9], nf = v[10]
-        // Same tensors as train.py's Ranker (and the export order).
+        // Same tensors as Ranker.swift reads, in file order.
         let perLayer = 2 * d + (3 * d * d + 3 * d) + (d * d + d) + 2 * d + (2 * d * d + 2 * d) + (2 * d * d + d)
         let nin = 3 * d + nf, n = max(experts, 1)
         var params = buckets * d + ctx * d + (4 * d + d) + layers * perLayer + 2 * d + (d * d + d)
@@ -95,12 +95,12 @@ enum ModelStore {
         return RankerInfo(layers: layers, heads: rankerHeads, dim: d, experts: experts, params: params)
     }
 
-    /// Training round of Models/ranker-dense.rank (update with the file).
+    /// Version of Models/ranker-dense.rank (update with the file).
     static let bundledRankerRound = 10
 
     /// Gemma is download-only (not bundled: it would add 100 MB to the app).
     static let gemmaFile = "gemma-3-270m-enfrdees64k-Q4_0.gguf"
     static func gemmaURL() -> URL? { localURL(gemmaFile) }
-    /// From the GGUF: 18 blocks, 4 heads (1 KV), vocabulary pruned to 64k.
+    /// From the GGUF: 18 blocks, 4 heads (1 KV).
     static let gemmaLabel = "Transformer 18L × 4H, 141M params"
 }

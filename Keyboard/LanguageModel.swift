@@ -1,8 +1,8 @@
 import Foundation
 import llama
 
-/// The on-device English+French model (Gemma 3 270M with its vocabulary
-/// pruned to the two languages). Not thread-safe: use it from one serial queue.
+/// The optional on-device Gemma 3 270M model, downloaded from the app.
+/// Not thread-safe: use it from one serial queue.
 ///
 /// Sequence 0 in the KV cache holds the text before the current word and is
 /// reused between calls, so each keystroke only pays for the new tokens.

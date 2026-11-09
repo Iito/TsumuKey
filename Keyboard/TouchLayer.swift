@@ -122,10 +122,8 @@ final class TouchView: UIView {
             let raw = touch.location(in: self)
             let p = CGPoint(x: raw.x, y: raw.y + Self.aimCorrection)
             guard let geo = key(at: p) else {
-                TouchLog.log("BEGIN none at \(Int(p.x)),\(Int(p.y)) keys=\(keys.count)")
                 continue
             }
-            TouchLog.log("BEGIN \(geo.key.logLabel) at \(Int(p.x)),\(Int(p.y)) active=\(sessions.count)")
 
             // Rollover: a new finger types any key still held down, so fast
             // overlapping taps all land, in order.
@@ -133,7 +131,6 @@ final class TouchView: UIView {
                 guard other.geo.key.action != .backspace else { continue }
                 other.holdWork?.cancel()
                 other.committed = true
-                TouchLog.log("ROLLOVER commit \(other.geo.key.logLabel)")
                 state.pressedKeys.remove(other.geo.id)
                 if !other.geo.key.flicks.isEmpty { state.popup = nil; state.flickGuide = nil }
                 state.tap(Self.typed(other), at: other.point)
@@ -219,10 +216,8 @@ final class TouchView: UIView {
         guard let state else { return }
         for touch in touches {
             guard let session = sessions.removeValue(forKey: ObjectIdentifier(touch)) else {
-                TouchLog.log("\(cancelled ? "CANCEL" : "END") unknown touch")
                 continue
             }
-            TouchLog.log("\(cancelled ? "CANCEL" : "END") \(session.geo.key.logLabel) committed=\(session.committed) long=\(session.longPressed)")
             session.holdWork?.cancel()
             state.pressedKeys.remove(session.geo.id)
 

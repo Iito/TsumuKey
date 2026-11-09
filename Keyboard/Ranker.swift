@@ -1,10 +1,10 @@
 import Foundation
 
-/// Small candidate ranker (tsumukey-train, train.py) that replaces Gemma for
+/// Small candidate ranker that replaces Gemma for
 /// correction: a few MB instead of ~100. It scores how well a word fits after
 /// the context, on the same scale the decoder adds to the tap fit.
 ///
-/// Words are hashed character n-grams (tsumukey-train common.py, must match), so
+/// Words are hashed character n-grams (must match the model file), so
 /// there's no vocabulary. Context: a 2-layer transformer over the last 8
 /// tokens. Head: one of several small expert MLPs, picked per context by a
 /// router (mixture of experts, top-1), or a single dense one.
@@ -154,8 +154,8 @@ final class Ranker: WordScorer {
     func quickScore(_ words: [String], leadingSpace: Bool) -> [Float] { score(words, leadingSpace: leadingSpace) }
 
     /// Next-word suggestions: scores the most frequent words of the enabled
-    /// languages after the context (trained with prep.py --predict; earlier
-    /// models were not, and give poor suggestions).
+    /// languages after the context (models from v6 on; earlier ones give
+    /// poor suggestions).
     func predict(count: Int, leadingSpace: Bool) -> [String] {
         guard let lexicon else { return [] }
         let mask = lexicon.languages
@@ -174,7 +174,7 @@ final class Ranker: WordScorer {
         return s.indices.sorted { s[$0] > s[$1] }.prefix(count).map { shortlist[$0] }
     }
 
-    /// Words considered for suggestions (prep.py SHORTLIST, must match).
+    /// Words considered for suggestions (must match the model).
     static let shortlistSize = 2000
     private var shortlist: [String] = []
     private var shortlistMask: UInt8?
@@ -276,7 +276,7 @@ final class Ranker: WordScorer {
         return v.indices.map { (v[$0] - mean) * r * w[$0] + b[$0] }
     }
 
-    // MARK: Hashing (tsumukey-train common.py)
+    // MARK: Hashing (must match the model file)
 
     static func fnv1a(_ s: String) -> UInt32 {
         var h: UInt32 = 0x811C9DC5

@@ -33,9 +33,7 @@ final class KanaConverter {
     func load() {
         queue.async {
             guard self.converter == nil else { return }
-            let started = Date()
             self.converter = KanaKanjiConverter.withDefaultDictionary()
-            TouchLog.log("KANA loaded \(Int(Date().timeIntervalSince(started) * 1000))ms mem=\(Memory.footprintMB())MB")
         }
     }
 
@@ -45,7 +43,6 @@ final class KanaConverter {
             guard let converter = self.converter else { return }
             converter.commitUpdateLearningData()
             self.converter = nil
-            TouchLog.log("KANA unloaded mem=\(Memory.footprintMB())MB")
         }
     }
 
@@ -63,10 +60,7 @@ final class KanaConverter {
             if fresh { self.converter!.stopComposition() }
             var options = self.options
             options.requireJapanesePrediction = predict
-            let started = Date()
             let result = self.converter!.requestCandidates(text, options: options)
-            let ms = Int(Date().timeIntervalSince(started) * 1000)
-            TouchLog.log("KANA \(text.convertTarget) → \(result.mainResults.prefix(3).map(\.text)) \(ms)ms mem=\(Memory.footprintMB())MB")
             DispatchQueue.main.async {
                 if self.isLatest(id) { done(result.mainResults) }
             }
@@ -89,43 +83,6 @@ final class KanaConverter {
 
     func save() {
         queue.async { self.converter?.commitUpdateLearningData() }
-    }
-
-    /// Temporary measurement: what azooKey's dictionary costs on top of the
-    /// English/French model, for Japanese candidates in the ABC keyboard.
-    /// Run once when the app was launched with "-memProbe 1".
-    func memoryProbe() {
-        queue.async {
-            func mark(_ what: String) {
-                TouchLog.log("PROBE \(what) footprint=\(Memory.footprintMB())MB available=\(Memory.availableMB())MB")
-                TouchLog.flush()
-            }
-            mark("start")
-            var converter: KanaKanjiConverter? = KanaKanjiConverter.withDefaultDictionary()
-            mark("dictionary opened")
-            var options = self.options
-            options.learningType = .nothing   // don't touch the real learning data
-            options.N_best = 5
-            // Different first kana, so each one opens new dictionary files.
-            let words = ["watashi", "arigatou", "konnichiha", "sugoi", "taberu", "nihongo",
-                         "kyou", "ashita", "yoroshiku", "onegai", "daijoubu", "hontou",
-                         "mainichi", "renraku", "chotto", "gomen", "ii", "uchi", "eki", "furui",
-                         "nihongowohanasu", "ashitahaamedesu"]
-            for predict in [false, true] {
-                options.requireJapanesePrediction = predict
-                for word in words {
-                    var text = ComposingText()
-                    text.insertAtCursorPosition(word, inputStyle: .roman2kana)
-                    let started = Date()
-                    let result = converter!.requestCandidates(text, options: options)
-                    converter!.stopComposition()
-                    let ms = Int(Date().timeIntervalSince(started) * 1000)
-                    mark("\(word) → \(result.mainResults.prefix(2).map(\.text)) \(ms)ms predict=\(predict)")
-                }
-            }
-            converter = nil
-            mark("dictionary closed")
-        }
     }
 
     private func isLatest(_ id: Int) -> Bool {

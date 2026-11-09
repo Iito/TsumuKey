@@ -25,17 +25,14 @@ final class Predictor {
     func load() {
         queue.async { [self] in
             guard decoder == nil, !loadFailed else { return }
-            let started = Date()
             guard let words = Bundle.main.url(forResource: "lexicon-enfrdees", withExtension: "bin"),
                   let lexicon = Lexicon(url: words),
                   let lm = makeScorer(lexicon) else {
                 loadFailed = true
-                TouchLog.log("LM load failed (\(model.rawValue))")
                 return
             }
             decoder = WordDecoder(lm: lm, lexicon: lexicon)
             apply()
-            TouchLog.log("LM loaded \(Int(Date().timeIntervalSince(started) * 1000))ms footprint=\(Memory.footprintMB())MB")
             DispatchQueue.main.async { self.isReady = true }
         }
     }
@@ -58,7 +55,6 @@ final class Predictor {
             // Downloaded by the app (ModelStore); falls back to the small ranker
             // so the keyboard still corrects when Gemma isn't there.
             if let path = ModelStore.gemmaURL()?.path, let lm = LanguageModel(path: path) { return lm }
-            TouchLog.log("Gemma not downloaded, using the small ranker")
             guard let url = ModelStore.rankerURL()?.url, let r = Ranker(url: url) else { return nil }
             r.lexicon = lexicon
             return r
@@ -85,8 +81,7 @@ final class Predictor {
         (decoder?.lm as? Ranker)?.languages = languages
     }
 
-    /// Gemma 3 270M with its vocabulary cut to English, French, German and
-    /// Spanish (Tools/prune_vocab.py).
+    /// Gemma 3 270M, as published on the TsumuKey Hugging Face repo.
     static let modelName = "gemma-3-270m-enfrdees64k-Q4_0"
 
     /// Frees the model; the next `load` brings it back.
@@ -113,7 +108,6 @@ final class Predictor {
     private func run(_ request: DecodeRequest, full: Bool, _ completion: @escaping (DecodeResult) -> Void) {
         guard let decoder else { return }
         let result = decoder.decode(request, full: full)
-        TouchLog.log(result.log + " mem=\(Memory.footprintMB())MB")
         DispatchQueue.main.async { completion(result) }
     }
 }

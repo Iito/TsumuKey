@@ -106,9 +106,6 @@ struct ContentView: View {
                 if chain > 0 { timing.multiTapWindow = chain; timing.save() }
                 let rowHeight = UserDefaults.standard.double(forKey: "rowHeight")
                 if rowHeight > 0 { settings.rowHeight = rowHeight; settings.save() }
-                // Temporary: "-memProbe 1" asks the keyboard to measure the
-                // Japanese dictionary's memory cost the next time it opens.
-                if UserDefaults.standard.bool(forKey: "memProbe") { text = "memprobe" }
                 // UI tests: "-prefill <text>" starts the field with that text,
                 // as if just typed (the keyboard reads the word before the cursor).
                 if let prefill = UserDefaults.standard.string(forKey: "prefill") { text = prefill }
@@ -127,7 +124,6 @@ struct ContentView: View {
                 // UI tests: "-model gemma|dense|moe" picks the correction model.
                 if let name = UserDefaults.standard.string(forKey: "model"),
                    let m = CorrectionModel(rawValue: name) { settings.correctionModel = m; settings.save() }
-                Bench.runIfRequested()
                 guard ProcessInfo.processInfo.arguments.contains("-autofocus") else { return }
                 advancedOpen = true
                 // Focusing during the first layout pass is ignored; wait a moment.
@@ -468,6 +464,10 @@ extension ContentView {
     private var lookPage: some View {
         Form {
             Section {
+                LookPreview(settings: settings)
+                    .listRowInsets(EdgeInsets())
+            }
+            Section {
                 Picker("Theme", selection: $settings.theme) {
                     ForEach(KeyboardTheme.allCases) { Text($0.name).tag($0) }
                 }
@@ -675,6 +675,86 @@ struct LayoutPreview: View {
             .background(dim ? Color(.systemGray4) : Color(.systemBackground),
                         in: RoundedRectangle(cornerRadius: 5))
             .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color(.separator), lineWidth: 0.5))
+            .frame(width: width)
+    }
+}
+
+/// The Look page's keyboard: the layout in use, in the chosen theme and letter
+/// colours, drawn with the keyboard's own palette.
+private struct LookPreview: View {
+    let settings: KeyboardSettings
+
+    var body: some View {
+        GeometryReader { geo in
+            let unit = (geo.size.width - 6) / 10
+            let rows = settings.layout.rows
+            VStack(spacing: 8) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { r, row in
+                    let letters = Array(row)
+                    HStack(spacing: 0) {
+                        if r == 2 { key("⇧", width: edge(letters) * unit, functional: true) }
+                        Spacer(minLength: 0)
+                        ForEach(Array(letters.enumerated()), id: \.offset) { i, c in
+                            key(String(c).uppercased(), width: width(r, letters) * unit,
+                                color: color(c, LetterSpot(row: r, x: center(r, i, letters))))
+                        }
+                        Spacer(minLength: 0)
+                        if r == 2 { key("⌫", width: edge(letters) * unit, functional: true) }
+                    }
+                }
+                HStack(spacing: 0) {
+                    key("123", width: 1.5 * unit, functional: true)
+                    key("⚙︎", width: 1 * unit, functional: true)
+                    key(",", width: 1 * unit)
+                    key("", width: 4 * unit)
+                    key(".", width: 1 * unit)
+                    key("⏎", width: 1.5 * unit, functional: true)
+                }
+            }
+            .padding(.horizontal, 3)
+            .padding(.vertical, 8)
+        }
+        .frame(height: 4 * 40 + 3 * 8 + 16)
+        .background(Palette.background)
+        .environment(\.colorScheme, scheme ?? colorScheme)
+        .accessibilityElement()
+        .accessibilityLabel("Keyboard preview")
+    }
+
+    @Environment(\.colorScheme) private var colorScheme
+    private var scheme: ColorScheme? {
+        switch settings.theme {
+        case .system: return nil
+        case .day: return .light
+        case .night: return .dark
+        }
+    }
+
+    // Same widths as the keyboard: the bottom letter row sits between shift and
+    // delete (1.5 units each, or 1 when it has more than 7 letters).
+    private func edge(_ letters: [Character]) -> CGFloat { letters.count > 7 ? 1 : 1.5 }
+    private func width(_ r: Int, _ letters: [Character]) -> CGFloat {
+        r < 2 ? 1 : min(1, (10 - 2 * edge(letters)) / CGFloat(letters.count))
+    }
+    /// Key centre in the 10-unit grid (for the left/right thumb split).
+    private func center(_ r: Int, _ i: Int, _ letters: [Character]) -> Double {
+        let w = width(r, letters)
+        let start = (10 - CGFloat(letters.count) * w) / 2
+        return Double(start + (CGFloat(i) + 0.5) * w)
+    }
+
+    private func color(_ c: Character, _ spot: LetterSpot) -> Color {
+        guard let hex = settings.letterColors.hex(letter: Character(c.lowercased()), spot: spot),
+              let ui = UIColor(hex: hex) else { return .primary }
+        return Color(UIColor { $0.userInterfaceStyle == .dark ? ui.readableOnDarkKeys : ui })
+    }
+
+    private func key(_ label: String, width: CGFloat, functional: Bool = false, color: Color = .primary) -> some View {
+        Text(label)
+            .font(.system(size: label.count > 1 ? 14 : 20))
+            .foregroundStyle(functional ? .primary : color)
+            .frame(width: max(width - 5, 0), height: 40)
+            .background(functional ? Palette.functional : Palette.key, in: RoundedRectangle(cornerRadius: 6))
             .frame(width: width)
     }
 }

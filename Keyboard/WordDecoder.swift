@@ -66,6 +66,14 @@ final class WordDecoder {
     static var replaceRealWordMargin: Float = 4.5
     /// Same, when the typed word isn't a word in either language.
     static var replaceTypoMargin: Float = 0.5
+    /// Same, when the typed word is in the word list but rare there: web text
+    /// is full of misspellings ("teh", "recieved"), so the list has them too.
+    static var replaceRareWordMargin: Float = 2
+    /// Zipf frequency (in the enabled languages) below which a typed word counts as rare.
+    static let rareZipf: Float = 3
+    /// Cost of two neighbouring letters typed in the wrong order ("wrold"):
+    /// each tap hit the key it meant, just in the other's turn.
+    static var swapCost: Float = 3
     /// Candidates too far from the taps aren't fixes, they're other words.
     static let worstSpatial: Float = -12
     /// Same letters, different accents or apostrophe ("a" → "à"), when what
@@ -165,6 +173,7 @@ final class WordDecoder {
         if r.autocorrect, let best = fixes.max(by: { total[$0]! < total[$1]! }) {
             let accentOnly = Lexicon.key(best) == typedKey
             var margin = typedIsWord ? Self.replaceRealWordMargin : Self.replaceTypoMargin
+            if typedIsWord, enabledZipf(typed) < Self.rareZipf { margin = Self.replaceRareWordMargin }
             // "a"/"à" is a coin flip the small model calls by only a nat or
             // so, and English context never favours "à": trust the lean.
             if accentOnly { margin = min(margin, typedKey.count == 1 ? 0.5 : Self.accentMargin) }
@@ -228,6 +237,17 @@ final class WordDecoder {
         }
         for k in Set(keyOf.values).union([typedKey]) where spatial[k] == nil {
             spatial[k] = Self.spatial(k, taps: taps, keys: r.keys)
+        }
+        // A swap's taps fit its letters as well as they fit the typed ones,
+        // only in the other order; the walk scores them as two far misses.
+        if let typedSpatial = spatial[typedKey] {
+            let letters = Array(typedKey)
+            for i in letters.indices.dropLast() where letters[i] != letters[i + 1] {
+                var w = letters
+                w.swapAt(i, i + 1)
+                let k = String(w)
+                if let s = spatial[k] { spatial[k] = max(s, typedSpatial - Self.swapCost) }
+            }
         }
         return Generated(taps: taps, typedIsWord: typedIsWord, keyOf: keyOf, spatial: spatial)
     }
@@ -350,6 +370,12 @@ final class WordDecoder {
             out.insert(String(w))
         }
         return out
+    }
+
+    /// How common the word is in the languages turned on (0 when absent).
+    private func enabledZipf(_ word: String) -> Float {
+        let z = lexicon.zipfs(of: word)
+        return z.indices.filter { lexicon.languages & (1 << UInt8($0)) != 0 }.map { z[$0] }.max() ?? 0
     }
 
     /// A word as it should appear: the typed word's capitals, and English "I".

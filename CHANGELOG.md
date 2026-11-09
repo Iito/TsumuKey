@@ -13,8 +13,31 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.11.1 (build 71), 2026-11-09
+Installed on the iPhone 15 and the iPhone 16 Pro Max.
+- Debug code removed before open-sourcing: the keystroke and memory log (touch.log), the
+  memory probe and the -bench mode. Nothing the keyboard does changes.
+
+## 0.11.1 (build 70), 2026-11-09
+Installed on the iPhone 15 and the iPhone 16 Pro Max.
+- Swapped letters are fixed: "wrold" → world, "teh" → the, "tiem" → time. A swap's taps
+  hit the right keys in the wrong order, so it now costs one slip (3 nats) instead of two
+  far misses; before, "hello wrold" became "Hello would".
+- Rare words in the word list (web misspellings like "teh", "recieved", zipf below 3) need
+  a smaller margin to be replaced (2 nats instead of 4.5).
+- French accents on one-letter words: "a" → "à" now happens while typing. The late fix
+  skipped one-letter words, so only the bar's slower path could ever add the accent (the
+  iOS keyboard comparison showed 35/45 accents restored vs 41/42).
+- App icon: the first design (keycap "a") back, with a red 紡 in the corner instead of "à".
+
+## 0.11.0 (build 69), 2026-11-09
+Installed on the iPhone 15 and the iPhone 16 Pro Max.
+- Look page: a live keyboard preview on top, in the layout in use, the chosen theme and the
+  letter colours (rows, thumbs, vowels), drawn with the keyboard's own colours (Palette
+  moved to Shared).
+
 ## 0.11.0 (build 68), 2026-11-09
-Installed on the iPhone 15.
+Installed on the iPhone 15 and the iPhone 16 Pro Max.
 - Layouts page: the key pictures no longer fill a section at the bottom. Holding a layout
   shows its keys in a pop-up (iOS context menu), with Make Default / Remove for layouts in
   use and Add for the others.
@@ -82,7 +105,6 @@ Installed on the iPhone 15.
 - Memory safety net: when iOS warns and less than 25 MB is left (was 15 MB), the model and
   the kana dictionary are dropped and reloaded fresh, at most once a minute, instead of
   waiting for iOS to kill the keyboard near 76 MB and fall back to the previous keyboard.
-  The log notes memory 3 s after each reset, to show whether those two hold the growth.
   On the 16 Pro Max the growth didn't reproduce: 20 opens stayed at 25 MB, the 70 bench
   sentences at 29-31 MB, switching between five apps at 35 MB.
 
@@ -152,7 +174,7 @@ Installed on the iPhone 15.
   Travel, Activities, Objects, Symbols, Flags. A category bar between ABC and delete jumps to
   each; the current one is highlighted as you scroll.
 - Data: Keyboard/emoji.tsv (1,870 emoji, Unicode 15.0 for iOS 17, no skin-tone variants,
-  419 KB), built by tsumukey-train tools/build_emoji.py.
+  419 KB).
 
 ## 0.7.0 (build 50), 2026-11-08
 Installed on the iPhone 15.
@@ -211,11 +233,7 @@ Installed on the iPhone 15 (superseded by 43: the question didn't show).
 
 ## 0.5 (build 41), 2026-11-07
 Installed on the iPhone 15.
-- Small model is v10 (round 10): round 9's setup plus 30% of next-word examples with only one
-  language enabled. Same architecture (2L × 4H, 4.29M params). Mac test set (12,351 words):
-  corrections careful 95.7%, fast 87.2%; suggestions top-3 29.4% with two languages. With one
-  language it works on its own: English 35.4% (Gemma 37.5% with two), French 32.1%,
-  German 27.0%, Spanish 26.4%, better than build 31's workaround (31.2 / 30.7 / 25.5 / 26.1).
+- Built-in small model updated to v10: better suggestions when only one language is on.
 - Build 31's one-language workaround is removed from Ranker.predict: every model the keyboard
   can use is now v10 or newer (a download is only used when newer than the built-in one).
 
@@ -287,28 +305,21 @@ Installed on the iPhone 15.
 
 ## 0.5 (build 31), 2026-11-07
 Installed on the iPhone 15.
-- Fix: with one prediction language, suggestions were nearly useless (test set top-3 1.3%).
-  The model was trained with two languages enabled; the one-language word list holds ~800
-  words it never saw as candidates, and they got wild scores ("thomas", "budget"). Found by
-  inspecting the weights and activations (tsumukey-train wsp.py). Ranker.predict now runs a
-  lone language as the pair it was trained on (English+French, French+English,
-  German+French, Spanish+English) and keeps only that language's words: top-3 29.0%,
-  same as with two languages. Two-language results unchanged.
+- Fix: with one prediction language, suggestions were nearly useless: the one-language word
+  list holds ~800 words the model had never seen as candidates, and they got wild scores
+  ("thomas", "budget"). Ranker.predict now runs a lone language as a pair (English+French,
+  French+English, German+French, Spanish+English) and keeps only that language's words, so
+  suggestions are as good as with two languages. Two-language results unchanged.
 
 ## 0.5 (build 30), 2026-11-07
 Installed on the iPhone 15.
-- Small model is round 9: round 8's setup trained twice as long (6 epochs). Same
-  architecture (2L × 4H, 4.29M params), same speed. Mac test set (12,351 words):
-  corrections careful 95.7%, fast 87.1% (round 8 95.5 / 86.7); suggestions top-3 29.3%,
-  top-1 17.5% (round 8 28.6 / 16.6, Gemma 30.2 / 18.2). A wider, 3-layer variant
-  (6.56M params) was no better.
+- Built-in small model updated to round 9: slightly better corrections and suggestions,
+  same size and speed.
 
 ## 0.5 (build 29), 2026-11-07
 Installed on the iPhone 15.
-- Small model is round 8: next-word training scores the right word against the whole
-  2,000-word shortlist, as the keyboard does, instead of 32 sampled words. Mac test set
-  (12,351 words): suggestions top-3 28.6% (round 7 26.0%, Gemma 30.2%), top-1 16.6%;
-  corrections unchanged (careful 95.5%, fast 86.7%).
+- Built-in small model updated to round 8: better next-word suggestions, corrections
+  unchanged.
 - A downloaded ranker is used only when its round is newer than the built-in one.
 - azooKey comes from a patched fork as a Swift package; llama.cpp is a submodule built by
   Tools/build_llama_ios.sh (b12063, same as before).
@@ -316,8 +327,8 @@ Installed on the iPhone 15.
 ## 0.5 (build 28), 2026-11-07
 Installed on the iPhone 15.
 - Models are named by architecture: "Small (Transformer 2L × 4H, 4.3M params)", read from
-  the .rank file's header, and "Gemma 3 (Transformer 18L × 4H, 141M params)" (vocabulary
-  pruned to 64k, so not 270M). Same names in the Hugging Face models.json.
+  the .rank file's header, and "Gemma 3 (Transformer 18L × 4H, 141M params)". Same names in
+  the Hugging Face models.json.
 
 ## 0.5 (build 27), 2026-11-07
 Installed on the iPhone 15. First build with the real TsumuKey IDs (com.tsumukey,
@@ -333,39 +344,30 @@ app next to the old BetterKeys-ID one.
   list with Download / Delete, and progress.
 
 ## 0.5 (build 26), 2026-11-07
-Installed on the iPhone 15 (bench project with the old BetterKeys IDs, see build 22).
+Installed on the iPhone 15.
 - "Correction model" picker in the app's settings, naming the bundled model and its
   training round: Small, round 7 (4.5 MB) or Gemma 270M (100 MB). MoE stays bench-only.
-- Round-7 ranker (Models/ranker-dense.rank): adds a task flag (correcting vs suggesting).
-  Mac test set: corrections 95.5% / 86.9% careful / fast, suggestions top-3 26.0%
-  (Gemma 91.8% / 78.0%, 30.2%).
+- Built-in small model updated to round 7 (Models/ranker-dense.rank): better corrections.
 
 ## 0.5 (build 25), 2026-11-07
-Installed on the iPhone 15 (bench project with the old BetterKeys IDs, see build 22).
+Installed on the iPhone 15.
 - Correction model now defaults to the small dense ranker (round 6, Models/ranker-dense.rank),
   which also gives next-word suggestions (Ranker.predict: ranks the 2000 most frequent
   words of the enabled languages). Gemma stays bundled as an option.
-- Round 6 = round-5 data plus a next-word example per word. Mac test set, 12,351 words:
-  suggestions top-3 25.8% (Gemma 30.2%), corrections 94.7% / 84.4% careful / fast
-  (round 5: 95.5% / 86.6%, Gemma 91.8% / 78.0%).
 
 ## 0.5 (build 24), 2026-11-07
-Bench build, installed on the iPhone 16 Pro Max (bench project with the old BetterKeys IDs, see build 22).
-- Round-5 rankers bundled (Models/ranker-dense.rank, ranker-moe.rank): trained on 4.94M
-  words, 5x round 3. Mac test set, 12,351 words (careful / fast): dense 95.5% / 86.6%,
-  MoE 95.4% / 86.6%, Gemma 91.8% / 78.0%; 10 ms per word vs Gemma's 104 ms.
+Bench build, installed on the iPhone 16 Pro Max.
+- Round-5 rankers bundled (Models/ranker-dense.rank, ranker-moe.rank).
 - On-phone bench, iPhone 16 Pro Max, Colemak, 606 words (careful / fast): r5 dense
   90.8% / 68.6%, r5 MoE 90.6% / 69.1%, Gemma 90.4% / 66.7% (Gemma re-run on this build).
   Default stays Gemma.
 
 ## 0.5 (build 23), 2026-11-07
-Installed on the iPhone 15, then on the iPhone 16 Pro Max by the lock-phone test run (bench project with the old BetterKeys IDs, see build 22).
+Installed on the iPhone 15, then on the iPhone 16 Pro Max by the lock-phone test run.
 - New app icon: a keycap whose "t" runs off the key as thread (Tools/make_icon.swift).
 
 ## 0.5 (build 22), 2026-11-07
 Bench build, installed on the iPhone 16 Pro Max (on-phone typing bench) and the iPhone 15.
-Built from a copy of project.yml with the old com.example.betterkeys IDs, because the
-TsumuKey IDs have no signing profiles yet; the repo keeps the TsumuKey IDs.
 - Correction model setting (Gemma 270M, or a ~4.6 MB candidate ranker with a dense or
   mixture-of-experts head, Tools/rank). "-model gemma|dense|moe" launch argument; the
   UI bench passes it with BENCH_MODEL. Default stays Gemma.
@@ -450,8 +452,7 @@ Installed on the iPhone 15 (not tested there). Not on the iPhone 16 Pro Max yet 
   App: new "Layouts in the keyboard menu" section.
 - Prediction languages: pick 1 or 2 of English, French, German, Spanish (app
   section "Prediction languages", default English + French). The model is now
-  Gemma 3 270M cut to a 64k vocabulary covering all four
-  (gemma-3-270m-enfrdees64k-Q4_0.gguf, was enfr48k), and the word list stores
+  Gemma 3 270M covering all four, and the word list stores
   each word's frequency per language (lexicon-enfrdees.bin, format BKW2), so
   turning a language off hides its words and "die" ranks as English.
   French elisions and English/French contractions only apply when that language is on.

@@ -20,6 +20,8 @@ final class TypingBench: XCTestCase {
         let env = ProcessInfo.processInfo.environment
         if let m = env["BENCH_MODEL"] { app.launchArguments += ["-model", m] }
         if let l = env["BENCH_LAYOUT"] { app.launchArguments += ["-layout", l] }
+        // BENCH_NUMBERROW 1|0 turns the number row on or off (it stays that way).
+        if let n = env["BENCH_NUMBERROW"] { app.launchArguments += ["-numberRow", n] }
         app.launch()
         sleep(2)
     }
@@ -107,18 +109,6 @@ final class TypingBench: XCTestCase {
         }
     }
 
-    /// Taps a vertical line of points (x = PROBE_X, every 6 pt from 600 to
-    /// 900) to find where touches stop reaching the keyboard.
-    func testProbe() throws {
-        let x = CGFloat(Double(ProcessInfo.processInfo.environment["PROBE_X"] ?? "") ?? 230)
-        field.tap()
-        for y in stride(from: 600.0, through: 900.0, by: 6.0) {
-            print("PROBE|\(Int(y))")
-            try FastTaps.tapPoints([NSValue(cgPoint: CGPoint(x: x, y: CGFloat(y)))], atTimes: [0], hold: 0.05)
-            usleep(150_000)
-        }
-    }
-
     /// Screenshots of the 123 layouts: hold 123 (symbols by default), then
     /// the "#+=" page. SHOT_123 and SHOT_PAGE are "x,y" in points.
     func testSymbolsShots() throws {
@@ -135,91 +125,6 @@ final class TypingBench: XCTestCase {
         if let (x, y) = point("SHOT_PAGE") { at(x, y).tap() }
         sleep(1)
         shot("symbols2")
-    }
-
-    /// Opens the keyboard with "-memProbe 1": the keyboard then measures the
-    /// Japanese dictionary's memory cost and writes it to its touch.log.
-    func testMemProbe() throws {
-        app.terminate()
-        app.launchArguments = ["-autofocus", "-memProbe", "1"]
-        app.launch()
-        sleep(90)
-    }
-
-
-    /// Leak hunt: closes and reopens the keyboard (home, back to the app)
-    /// CYCLES times, typing a few letters each time.
-    func testOpenClose() throws {
-        let cycles = Int(ProcessInfo.processInfo.environment["CYCLES"] ?? "") ?? 15
-        for _ in 0..<cycles {
-            if !field.exists || !(app.keyboards.count > 0) { field.tap() }
-            sleep(1)
-            // A few letters (Colemak h, e, n on the 16 Pro Max), so the model runs.
-            if ProcessInfo.processInfo.environment["NOTYPE"] == nil {
-                for (x, y) in [(254.0, 731.0), (297.0, 731.0), (340.0, 731.0)] { at(x, y).tap() }
-            }
-            sleep(1)
-            XCUIDevice.shared.press(.home)
-            sleep(1)
-            app.activate()
-            sleep(2)
-        }
-    }
-
-    /// Memory check across host apps: alternates the keyboard between this
-    /// app's field and Safari's address bar, typing a few letters in each.
-    func testAppSwitch() throws {
-        let cycles = Int(ProcessInfo.processInfo.environment["CYCLES"] ?? "") ?? 10
-        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
-        for _ in 0..<cycles {
-            app.activate(); sleep(1)
-            if !(app.keyboards.count > 0) { field.tap() }
-            sleep(1)
-            for (x, y) in [(254.0, 731.0), (297.0, 731.0), (340.0, 731.0)] { at(x, y).tap() }
-            sleep(1)
-            safari.activate(); sleep(2)
-            let address = safari.textFields.firstMatch
-            if !(safari.keyboards.count > 0) {
-                if address.exists { address.tap() } else { safari.buttons["Address"].firstMatch.tap() }
-            }
-            sleep(1)
-            for (x, y) in [(254.0, 731.0), (297.0, 731.0), (340.0, 731.0)] {
-                safari.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y)).tap()
-            }
-            sleep(1)
-        }
-    }
-
-    /// Like testAppSwitch with more hosts: this app, Safari, Settings search,
-    /// Contacts search, Maps search. Each host gets the keyboard once per round.
-    func testManyHosts() throws {
-        let rounds = Int(ProcessInfo.processInfo.environment["CYCLES"] ?? "") ?? 3
-        let hosts: [(String, (XCUIApplication) -> XCUIElement)] = [
-            ("com.apple.mobilesafari", { $0.textFields.firstMatch.exists ? $0.textFields.firstMatch : $0.buttons["Address"].firstMatch }),
-            ("com.apple.Preferences", { $0.searchFields.firstMatch }),
-            ("com.apple.MobileAddressBook", { $0.searchFields.firstMatch }),
-            ("com.apple.Maps", { $0.searchFields.firstMatch.exists ? $0.searchFields.firstMatch : $0.textFields.firstMatch }),
-        ]
-        func type(_ a: XCUIApplication) {
-            for (x, y) in [(254.0, 731.0), (297.0, 731.0), (340.0, 731.0)] {
-                a.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y)).tap()
-            }
-        }
-        for _ in 0..<rounds {
-            app.activate(); sleep(1)
-            if !(app.keyboards.count > 0) { field.tap() }
-            sleep(1); type(app); sleep(1)
-            for (id, find) in hosts {
-                let host = XCUIApplication(bundleIdentifier: id)
-                host.activate(); sleep(2)
-                if !(host.keyboards.count > 0) {
-                    let target = find(host)
-                    if target.waitForExistence(timeout: 3) { target.tap() } else { print("BENCHINFO|no field in \(id)"); continue }
-                }
-                sleep(1); type(host); sleep(1)
-                print("BENCHINFO|host \(id) keyboard=\(host.keyboards.count)")
-            }
-        }
     }
 
     /// For each ROMAJI word (comma separated): relaunches the app with the

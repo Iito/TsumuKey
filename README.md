@@ -70,28 +70,9 @@ and on this keyboard, Colemak, iPhone 15, 70 English, French and mixed sentences
 | Careful | 85.5% words right | **90.6%** |
 | Fast | 65.3% | **66.7%** |
 
-### Gemma 3 270M, before and after cutting its vocabulary
-
-The full model's 262k-token vocabulary alone needs ~55 MB on an iPhone, more than
-a keyboard's 76 MB limit allows next to everything else, so the vocabulary is cut
-to the tokens these languages use. Bits per character on held-out Wikipedia and
-Tatoeba text (lower is better):
-
-| Model | Vocabulary | Size | English | French | German | Spanish | EN+FR mixed |
-|---|---|---|---|---|---|---|---|
-| Gemma 3 270M (QAT, Q4_0) | 262k | 230 MB | 1.088 | 1.259 | 1.300 | 1.265 | 1.748 |
-| Cut to English + French | 48k | 87 MB | 1.174 | 1.287 | 2.430 | 2.228 | 1.753 |
-| **Cut to EN + FR + DE + ES (shipped)** | **64k** | **102 MB** | **1.175** | **1.282** | **1.325** | **1.292** | **1.758** |
-| LFM2.5 350M Base (Q4_0), for comparison | 65k | 219 MB | 1.139 | 1.239 | 1.251 | 1.305 | 1.837 |
-
-Cutting to 64k costs 2–8% against the full model and keeps German and Spanish
-(the English + French cut was ~85% worse on them). LFM2.5 350M is 3–6% better on
-single-language English, French and German text but worse on Spanish and on mixed
-sentences, at twice the size, so the keyboard stays on Gemma.
-
 ### On the phone
 
-- Memory: 35–39 MB on an iPhone 15 (limit 76 MB), steady across 20 openings (measured with the 48k model; the 64k one is expected to add ~6 MB).
+- Memory: 35–39 MB on an iPhone 15 (limit 76 MB), steady across 20 openings.
 - Japanese conversion: 1–26 ms per word; the kana dictionary adds ~4 MB.
 
 ## Building
@@ -117,8 +98,6 @@ Install Release builds: the decoder is about five times slower unoptimized.
 The app ships the word list (`Models/lexicon-enfrdees.bin`) and the small
 correction model (`Models/ranker-*.rank`). Gemma 3 is downloaded from the
 app, from [Hugging Face](https://huggingface.co/iito-sama/tsumukey-models).
-The scripts that build them and train the small model live in a separate
-repository, tsumukey-train.
 
 `Tools/build_llama_ios.sh` builds llama.cpp (a submodule pinned to b12063)
 as CPU-only static libraries into `Vendor/llama-cpu`, which isn't in git:
@@ -145,7 +124,7 @@ See `CHANGELOG.md` for what changed in each build.
 | [llama.cpp](https://github.com/ggml-org/llama.cpp) (`Vendor/llama.cpp`, submodule) | MIT |
 | [AzooKeyKanaKanjiConverter](https://github.com/azooKey/AzooKeyKanaKanjiConverter) (Swift package, [patched fork](https://github.com/Iito/AzooKeyKanaKanjiConverter/tree/tsumukey)) | MIT |
 | azooKey's dictionary (inside the converter) | Apache 2.0 |
-| [Gemma 3 270M](https://ai.google.dev/gemma) (downloaded, pruned) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) |
+| [Gemma 3 270M](https://ai.google.dev/gemma) (downloaded) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) |
 | Word frequencies from [wordfreq](https://github.com/rspeer/wordfreq) (`Models/lexicon-*.bin`) | Apache 2.0 (code); data under CC BY-SA 4.0 |
 
 ## Licence

@@ -24,7 +24,6 @@ final class KeyboardViewController: UIInputViewController {
         // finger unless every view on the way allows multi-touch. Fast
         // two-thumb typing overlaps constantly, so this lost real taps.
         view.isMultipleTouchEnabled = true
-        view.addGestureRecognizer(TouchSpy(target: nil, action: nil))
     }
 
     /// The SwiftUI keyboard. Built on open and torn down on close: iOS keeps
@@ -75,7 +74,6 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         if host == nil { installHost() }
-        TouchLog.reset()
         state.emojiSearch = nil
         state.tonePicker = nil
         // Pick up any changes made in the app since the keyboard last opened.
@@ -88,7 +86,6 @@ final class KeyboardViewController: UIInputViewController {
                        layout: state.settings.layout.rawValue).save()
         state.mode = state.textMode
         state.textChanged()
-        TouchLog.log("LIFE appear footprint=\(Memory.footprintMB())MB")
     }
 
     /// Rereads the shared settings: on appear, and while open whenever the app
@@ -159,28 +156,16 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
-    private static var probed = false
-
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        // Temporary: the app pre-fills "memprobe" when launched with
-        // "-memProbe 1". Checked after a delay so the English/French model
-        // has loaded first.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-            guard let self, !Self.probed,
-                  self.textDocumentProxy.documentContextBeforeInput == "memprobe" else { return }
-            Self.probed = true
-            KanaConverter.shared.memoryProbe()
-        }
         // iOS watches the screen edges for system swipes and holds back any
         // touch there until it rules a swipe out (~60 ms). On a keyboard that
         // makes the outer keys (q, a, p, o…) lag, and a quick next tap can
         // get lost. Keyboards don't need those swipes, so stop the delay.
         var v: UIView? = view
         while let current = v {
-            for recognizer in current.gestureRecognizers ?? [] where !(recognizer is TouchSpy) {
+            for recognizer in current.gestureRecognizers ?? [] {
                 if recognizer.delaysTouchesBegan {
-                    TouchLog.log("UNDELAY \(type(of: recognizer)) on \(type(of: current))")
                     recognizer.delaysTouchesBegan = false
                 }
             }
@@ -190,10 +175,8 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        TouchLog.log("LIFE disappear footprint=\(Memory.footprintMB())MB")
         state.commitComposition()
         KanaConverter.shared.save()
-        TouchLog.flush()
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -210,17 +193,11 @@ final class KeyboardViewController: UIInputViewController {
         // 25 MB left, the model and the kana dictionary are dropped and loaded
         // fresh, which also clears whatever they had built up. At most once a
         // minute: warnings come in bursts.
-        let available = Memory.availableMB()
-        let reset = available < 25 && Date().timeIntervalSince(lastReset) > 60
-        TouchLog.log("memory warning: footprint=\(Memory.footprintMB())MB available=\(available)MB\(reset ? " reset" : "")")
-        guard reset else { return }
+        guard Memory.availableMB() < 25, Date().timeIntervalSince(lastReset) > 60 else { return }
         lastReset = Date()
         state.predictor.unload()
         KanaConverter.shared.unload()
         state.loadEngines()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-            TouchLog.log("memory reset done: footprint=\(Memory.footprintMB())MB available=\(Memory.availableMB())MB")
-        }
     }
 
     override func textDidChange(_ textInput: UITextInput?) {

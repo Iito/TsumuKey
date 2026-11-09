@@ -104,13 +104,7 @@ enum LetterLayout: String, Codable, CaseIterable, Identifiable {
 
 struct KeyboardSettings: Codable, Equatable {
     var layout: LetterLayout = .qwerty
-    #if BENCH_NO_NUMBER_ROW
-    // Typing bench only (OTHER_SWIFT_FLAGS): the bench app has no App Group, so
-    // its keyboard can't read settings; this matches keyboards without a number row.
-    var numberRow = false
-    #else
     var numberRow = true
-    #endif
     /// Small symbol in each key's corner. Long-press works either way.
     var showSymbolHints = true
     /// Hide-keyboard button at the right end of the suggestion bar, in every app
@@ -224,12 +218,12 @@ enum PredictionLanguage: String, Codable, CaseIterable, Identifiable {
         case .spanish: return "Spanish"
         }
     }
-    /// Bit in the word list's per-word language mask (Tools/build_lexicon.py).
+    /// Bit in the word list's per-word language mask.
     var bit: UInt8 { 1 << UInt8(Self.allCases.firstIndex(of: self)!) }
 }
 
-/// Gemma 3 270M (~100 MB), or a ~5 MB candidate ranker (tsumukey-train repo):
-/// dense head, or mixture-of-experts head. Names carry the training round of the
+/// Gemma 3 270M (~100 MB), or a ~5 MB candidate ranker:
+/// dense head, or mixture-of-experts head. Names carry the version of the
 /// bundled .rank file: update them when Models/ranker-*.rank changes.
 enum CorrectionModel: String, Codable, CaseIterable, Identifiable {
     case gemma, dense, moe

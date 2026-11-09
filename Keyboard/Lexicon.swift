@@ -1,7 +1,7 @@
 import Foundation
 
-/// English/French/German/Spanish word list with per-language frequencies,
-/// built by Tools/build_lexicon.py. `languages` picks which ones count: words
+/// English/French/German/Spanish word list with per-language frequencies
+/// (from wordfreq). `languages` picks which ones count: words
 /// of the others are invisible, and shared words rank by the enabled ones.
 ///
 /// Words are filed under their key: plain a-z, no accents or apostrophes.

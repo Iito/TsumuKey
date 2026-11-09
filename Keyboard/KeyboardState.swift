@@ -201,7 +201,6 @@ final class KeyboardState: ObservableObject {
         let key = word.lowercased()
         guard !key.isEmpty, knownWords.insert(key).inserted else { return }
         UserDefaults.standard.set(Array(knownWords.suffix(2000)), forKey: "knownWords")
-        TouchLog.log("LEARN \(key)")
     }
     private func isKnown(_ word: String) -> Bool { knownWords.contains(word.lowercased()) }
     /// Punctuation that sticks to the word before it: "word ." becomes "word."
@@ -305,7 +304,6 @@ final class KeyboardState: ObservableObject {
         let s = smartened(s)
         lastCorrection = nil
         lateFix?.tail += s
-        TouchLog.log("INSERT \"\(s == " " ? "␣" : s)\"")
         proxy?.insertText(s)
         textChanged()
     }
@@ -391,13 +389,14 @@ final class KeyboardState: ObservableObject {
         guard let fix else { return nil }
         for _ in 0..<word.count { proxy?.deleteBackward() }
         proxy?.insertText(fix)
-        TouchLog.log("FIX \(word)→\(fix)")
         return (word, fix)
     }
 
     /// Typing outran the bar: the model hasn't seen this word yet.
+    /// One-letter words too: the decoder only ever gives them an accent
+    /// ("a" → "à" in French), which used to be skipped here.
     private func needsLateFix(_ word: String) -> Bool {
-        word.count >= 2 && mode == .letters && autocorrectOn && rejectedWord == nil
+        !word.isEmpty && mode == .letters && autocorrectOn && rejectedWord == nil
             && !isKnown(word) && predictor.isReady && correctionWord != word
     }
 
@@ -419,7 +418,6 @@ final class KeyboardState: ObservableObject {
         guard textBefore.hasSuffix(expected) else { return }
         for _ in 0..<expected.count { proxy?.deleteBackward() }
         proxy?.insertText(fix + late.trigger + late.tail)
-        TouchLog.log("LATEFIX \(late.word)→\(fix) tail=\(late.tail.count)")
         if late.tail.isEmpty { lastCorrection = (late.word, fix, late.trigger) }
         textChanged()
     }
@@ -904,7 +902,6 @@ final class KeyboardState: ObservableObject {
             guard let self, result.word == self.currentWord else { return }
             if result.suggestions != self.suggestions { self.suggestions = result.suggestions }
         }
-        TouchLog.log("refreshBar \(Int((CACurrentMediaTime() - started) * 1000))ms")
     }
 
     private func correction(for word: String) -> String? {

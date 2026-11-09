@@ -6,10 +6,19 @@ import UIKit
 /// silently falls back to defaults.
 enum SharedSettings {
     static let appGroup: String = {
-        // AltStore-style sideloaders rename App Groups per Apple ID and
-        // record the new name here.
-        (Bundle.main.object(forInfoDictionaryKey: "ALTAppGroups") as? [String])?.first
-            ?? "group.com.tsumukey"
+        // AltStore and SideStore rename the App Group per Apple ID and note
+        // the new name in Info.plist (ALTAppGroups), but not always in the
+        // keyboard's own Info.plist: then it's only in the containing app's,
+        // two folders up (TsumuKey.app/PlugIns/Keyboard.appex). The first name
+        // this process can actually open wins.
+        func noted(_ info: [String: Any]?) -> [String] { info?["ALTAppGroups"] as? [String] ?? [] }
+        let appInfo = NSDictionary(contentsOf: Bundle.main.bundleURL
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Info.plist")) as? [String: Any]
+        let candidates = noted(Bundle.main.infoDictionary) + noted(appInfo) + ["group.com.tsumukey"]
+        return candidates.first {
+            FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: $0) != nil
+        } ?? candidates[0]
     }()
     static let defaults = UserDefaults(suiteName: appGroup) ?? .standard
 

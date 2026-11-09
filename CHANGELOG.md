@@ -13,6 +13,13 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.11.3 (build 82), 2026-11-09
+Release build (GitHub release, sideloading). Builds 75-81 are the Korean work on its own branch.
+- Fix for sideloaded installs (SideStore, AltStore): the keyboard ignored the app's settings
+  (prediction languages, colours…) and used its defaults, even with Full Access on. These
+  tools rename the shared App Group per Apple ID and note the new name in the app's
+  Info.plist, but not always in the keyboard's; the keyboard now also reads the app's, and
+  uses the first App Group it can actually open.
 ## 0.12.0 (build 81), 2026-11-09
 Installed on the iPhone 15.
 - Korean in ABC: romanised Korean typed on the Latin keyboard offers the Hangul in the red

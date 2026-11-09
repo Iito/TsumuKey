@@ -166,6 +166,62 @@ final class TypingBench: XCTestCase {
         }
     }
 
+    /// Memory check across host apps: alternates the keyboard between this
+    /// app's field and Safari's address bar, typing a few letters in each.
+    func testAppSwitch() throws {
+        let cycles = Int(ProcessInfo.processInfo.environment["CYCLES"] ?? "") ?? 10
+        let safari = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+        for _ in 0..<cycles {
+            app.activate(); sleep(1)
+            if !(app.keyboards.count > 0) { field.tap() }
+            sleep(1)
+            for (x, y) in [(254.0, 731.0), (297.0, 731.0), (340.0, 731.0)] { at(x, y).tap() }
+            sleep(1)
+            safari.activate(); sleep(2)
+            let address = safari.textFields.firstMatch
+            if !(safari.keyboards.count > 0) {
+                if address.exists { address.tap() } else { safari.buttons["Address"].firstMatch.tap() }
+            }
+            sleep(1)
+            for (x, y) in [(254.0, 731.0), (297.0, 731.0), (340.0, 731.0)] {
+                safari.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y)).tap()
+            }
+            sleep(1)
+        }
+    }
+
+    /// Like testAppSwitch with more hosts: this app, Safari, Settings search,
+    /// Contacts search, Maps search. Each host gets the keyboard once per round.
+    func testManyHosts() throws {
+        let rounds = Int(ProcessInfo.processInfo.environment["CYCLES"] ?? "") ?? 3
+        let hosts: [(String, (XCUIApplication) -> XCUIElement)] = [
+            ("com.apple.mobilesafari", { $0.textFields.firstMatch.exists ? $0.textFields.firstMatch : $0.buttons["Address"].firstMatch }),
+            ("com.apple.Preferences", { $0.searchFields.firstMatch }),
+            ("com.apple.MobileAddressBook", { $0.searchFields.firstMatch }),
+            ("com.apple.Maps", { $0.searchFields.firstMatch.exists ? $0.searchFields.firstMatch : $0.textFields.firstMatch }),
+        ]
+        func type(_ a: XCUIApplication) {
+            for (x, y) in [(254.0, 731.0), (297.0, 731.0), (340.0, 731.0)] {
+                a.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y)).tap()
+            }
+        }
+        for _ in 0..<rounds {
+            app.activate(); sleep(1)
+            if !(app.keyboards.count > 0) { field.tap() }
+            sleep(1); type(app); sleep(1)
+            for (id, find) in hosts {
+                let host = XCUIApplication(bundleIdentifier: id)
+                host.activate(); sleep(2)
+                if !(host.keyboards.count > 0) {
+                    let target = find(host)
+                    if target.waitForExistence(timeout: 3) { target.tap() } else { print("BENCHINFO|no field in \(id)"); continue }
+                }
+                sleep(1); type(host); sleep(1)
+                print("BENCHINFO|host \(id) keyboard=\(host.keyboards.count)")
+            }
+        }
+    }
+
     /// For each ROMAJI word (comma separated): relaunches the app with the
     /// word pre-filled, opens the keyboard and screenshots the bar. With CHIP
     /// "x,y" it then taps there (the Japanese chip) and prints

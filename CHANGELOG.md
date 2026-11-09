@@ -13,6 +13,125 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.11.0 (build 68), 2026-11-09
+Installed on the iPhone 15.
+- Layouts page: the key pictures no longer fill a section at the bottom. Holding a layout
+  shows its keys in a pop-up (iOS context menu), with Make Default / Remove for layouts in
+  use and Add for the others.
+
+## 0.11.0 (build 67), 2026-11-09
+Installed on the iPhone 15.
+- Main settings page doesn't scroll or bounce when it fits on the screen; it still scrolls
+  when it doesn't (small phones, large text, the Full Access card).
+
+## 0.11.0 (build 66), 2026-11-09
+Installed on the iPhone 15.
+- "Try it here" moved to the Advanced page only. UI tests (-autofocus) open Advanced first.
+
+## 0.11.0 (build 65), 2026-11-09
+Installed on the iPhone 15.
+- Haptic feedback settings: on/off (also silences the flick and cursor ticks), feel
+  (Soft, Light, Medium, Heavy, Rigid; iOS doesn't let a keyboard set the vibration length,
+  these styles are the closest) and strength. Changing feel or strength plays a sample.
+  Default unchanged: Light at full strength.
+- "Delete Key" page renamed Advanced: haptics, key height, hide-keyboard button, and the
+  delete key timings.
+
+## 0.11.0 (build 64), 2026-11-09
+Installed on the iPhone 15.
+- Settings reorganised like iOS Settings: the main page is a short list of rows with
+  coloured icons and a one-line summary (Layouts, Languages & Model; Typing, Suggestion
+  Bar, Japanese, Keys, Look, Delete Key; Set Up), each opening its own page. "Try it here"
+  stays pinned on every page. The Full Access card still shows on top when it's off.
+- The Suggestion Bar page shows the date of the saved exchange rates.
+
+## 0.11.0 (build 63), 2026-11-09
+Installed on the iPhone 15.
+- Currency conversion without "=": an amount with a currency symbol at the end of the text
+  ("100€", "€100", "12,50 $", "5000円") fills the bar's three slots with the main
+  conversions; a tap replaces the amount with that one.
+  € → $ £ ¥; ¥/円 → $ € £; $ → € £ ¥; £ → $ € ¥.
+
+## 0.11.0 (build 62), 2026-11-09
+Installed on the iPhone 15.
+- Currency conversion (off by default): "100$ in €=", "100 usd to jpy =", "12,50 € en $="
+  show the converted amount in the bar; a tap types it. Symbols $ € £ ¥ 円 ₹ ₩ ₺, words
+  (dollars, euros, yen, pounds) and the ECB's 3-letter codes; "in", "to", "en", "a", "à",
+  "nach", "zu" between. Rates older than 3 days show their date in the bar.
+- Rates: the app fetches the European Central Bank's daily reference rates (one XML file,
+  nothing sent with it) when the setting is turned on, when the app comes to the front with
+  rates over 12 hours old, and from a daily background refresh. The keyboard reads the
+  saved copy and stays offline. Turning the setting off deletes the saved rates.
+
+## 0.11.0 (build 61), 2026-11-09
+Installed on the iPhone 15.
+- The last two iOS keyboard settings, both on by default:
+  - Smart punctuation: straight quotes become curly (opening after a space or bracket,
+    closing otherwise, so "don't" gets ’) and "--" becomes "—". Off in Japanese and in
+    text fields that ask for straight quotes or plain dashes.
+  - Show maths results: text ending in a sum and "=" ("12*3=", "(4+5)/2 =", "1,5+2,25=")
+    shows the result alone in the bar; a tap types it. + - * / × ÷ ^ % and brackets; a
+    decimal comma gives a comma result. Own parser (NSExpression crashes on bad input).
+
+## 0.11.0 (build 60), 2026-11-09
+Installed on the iPhone 15.
+- New settings, matching the iOS keyboard settings (iOS doesn't share its own with other
+  keyboards), all on by default: Auto-capitalisation, Caps lock (double-tap shift),
+  "." shortcut (double-tap space), Character preview (the letter above a pressed key).
+- Autocorrect stays off in text fields that ask for none (URLs, email addresses, code).
+- Memory safety net: when iOS warns and less than 25 MB is left (was 15 MB), the model and
+  the kana dictionary are dropped and reloaded fresh, at most once a minute, instead of
+  waiting for iOS to kill the keyboard near 76 MB and fall back to the previous keyboard.
+  The log notes memory 3 s after each reset, to show whether those two hold the growth.
+  On the 16 Pro Max the growth didn't reproduce: 20 opens stayed at 25 MB, the 70 bench
+  sentences at 29-31 MB, switching between five apps at 35 MB.
+
+## 0.10.0 (build 59), 2026-11-09
+Installed on the iPhone 15.
+- Suggestion bar letter animation a touch slower: 0.25 s instead of 0.2 s.
+
+## 0.10.0 (build 58), 2026-11-09
+Installed on the iPhone 15.
+- Suggestion bar words change like the iOS keyboard's, letter by letter: letters the old
+  and new word share slide to their new place, the others fade out or in (0.2 s). Build 56's
+  system morph melted the glyphs; build 57's whole-word crossfade didn't look like iOS.
+
+## 0.10.0 (build 57), 2026-11-09
+Installed on the iPhone 15.
+- Suggestion bar words crossfade (old word fades out as the new one fades in, 0.2 s)
+  instead of morphing letter by letter, which looked like melting.
+- Settings change notifications reach the keyboard through a weak box, so they no longer
+  hold a closed keyboard alive (part of the memory hunt: the keyboard grows 1-4 MB per
+  opening until iOS kills it at about 76 MB; not fixed yet).
+
+## 0.10.0 (build 56), 2026-11-08
+Installed on the iPhone 15.
+- Suggestion bar words morph like the iOS keyboard's: letters the old and new word share
+  slide into place, the others fade, in about 0.2 s (matched to a 60 fps screen recording
+  of the iOS bar). Before, words swapped instantly.
+
+## 0.10.0 (build 55), 2026-11-08
+Installed on the iPhone 15.
+- Layouts page: a "What they look like" section draws every layout's three letter rows as
+  small keys, laid out like the keyboard (short rows centred, shift and delete beside the
+  bottom row).
+- The letter rows moved from the keyboard's Layouts.swift to LetterLayout.rows (Shared), so
+  the app can draw them.
+
+## 0.10.0 (build 54), 2026-11-08
+Installed on the iPhone 15.
+- Bépo layout, in its letter order with É and À on their own keys; È, Ê and Ç are on
+  long-press (e, c). Its bottom row has 9 keys, so they are a little narrower. É and À
+  count as e and a for corrections (the accent fix from build 53).
+
+## 0.10.0 (build 53), 2026-11-08
+Installed on the iPhone 15.
+- Three more layouts: Workman, Norman and Maltron.
+  - Workman and Norman: ";" becomes an apostrophe, as in Colemak.
+  - Maltron's E is a thumb key on hardware; here it sits in the bottom row.
+- Accented letters picked by long-press now count as their plain letter
+  for corrections; before, an é mid-word counted as a typo against the corrector.
+
 ## 0.9.0 (build 52), 2026-11-08
 Installed on the iPhone 15.
 - Emoji skin tones: a default "Emoji skin tone" setting (Keyboard section) applies to the

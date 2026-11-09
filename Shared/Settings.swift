@@ -58,7 +58,7 @@ struct KeyboardReport: Codable, Equatable {
 }
 
 enum LetterLayout: String, Codable, CaseIterable, Identifiable {
-    case qwerty, colemak, azerty, qwertz, dvorak
+    case qwerty, colemak, azerty, qwertz, dvorak, bepo, workman, norman, maltron
 
     var id: Self { self }
     var name: String {
@@ -68,13 +68,49 @@ enum LetterLayout: String, Codable, CaseIterable, Identifiable {
         case .azerty: return "AZERTY"
         case .qwertz: return "QWERTZ"
         case .dvorak: return "Dvorak"
+        case .bepo: return "Bépo"
+        case .workman: return "Workman"
+        case .norman: return "Norman"
+        case .maltron: return "Maltron"
+        }
+    }
+
+    /// The three letter rows, top to bottom.
+    var rows: [String] {
+        switch self {
+        case .qwerty: return ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
+        // Colemak's ";" slot holds an apostrophe instead: French and English
+        // need it constantly, and ";" is still one long-press away.
+        case .colemak: return ["qwfpgjluy'", "arstdhneio", "zxcvbkm"]
+        // French phone AZERTY, with the apostrophe at the end of the bottom row.
+        case .azerty: return ["azertyuiop", "qsdfghjklm", "wxcvbn'"]
+        // German/Swiss: Z and Y swapped. Umlauts are on long-press (a, o, u).
+        case .qwertz: return ["qwertzuiop", "asdfghjkl", "yxcvbnm"]
+        // Dvorak as on a hardware keyboard, minus ";" (long-press on '):
+        // the bottom row has 9 letters, so its keys are a little narrower.
+        case .dvorak: return ["',.pyfgcrl", "aoeuidhtns", "qjkxbmwvz"]
+        // French Bépo in its letter order. É and À keep their own keys; È, Ê
+        // and Ç move to long-press (e, c), and "," "." live on the bottom row.
+        case .bepo: return ["bépovdljzw", "auiectsrnm", "àyxk'qghf"]
+        // Workman and Norman: ";" becomes an apostrophe, as in Colemak.
+        case .workman: return ["qdrwbjfup'", "ashtgyneoi", "zxmcvkl"]
+        case .norman: return ["qwdfkjurl'", "asetgynioh", "zxcvbpm"]
+        // Maltron puts E on a thumb key; a phone has none, so E sits mid
+        // bottom row with the letters Maltron keeps there (J G W K X).
+        case .maltron: return ["qpycbvmuzl", "anisfdthor", "jgewkx'"]
         }
     }
 }
 
 struct KeyboardSettings: Codable, Equatable {
     var layout: LetterLayout = .qwerty
+    #if BENCH_NO_NUMBER_ROW
+    // Typing bench only (OTHER_SWIFT_FLAGS): the bench app has no App Group, so
+    // its keyboard can't read settings; this matches keyboards without a number row.
+    var numberRow = false
+    #else
     var numberRow = true
+    #endif
     /// Small symbol in each key's corner. Long-press works either way.
     var showSymbolHints = true
     /// Hide-keyboard button at the right end of the suggestion bar, in every app
@@ -87,6 +123,26 @@ struct KeyboardSettings: Codable, Equatable {
     /// Height of one key row in points (the system keyboard is about 44–46).
     var rowHeight: Double = 50
     var autocorrect = true
+    /// Like the iOS keyboard settings (which iOS doesn't share with other
+    /// keyboards): capitals after a full stop, double-tap shift for caps lock,
+    /// double-tap space for ". ", the letter shown above a pressed key, and
+    /// the two below.
+    var autoCapitalize = true
+    var capsLock = true
+    var periodShortcut = true
+    var characterPreview = true
+    /// Key taps vibrate (and flick or cursor moves tick). Needs Full Access.
+    var haptics = true
+    var hapticStyle: HapticStyle = .light
+    /// 0.2...1, how strong each key tap is.
+    var hapticStrength: Double = 1
+    /// Curly quotes and apostrophes, "--" to "—".
+    var smartPunctuation = true
+    /// "12*3=" offers 36 in the bar.
+    var mathResults = true
+    /// "100$ in €=" in the bar. Off by default: the app then fetches daily
+    /// rates from the European Central Bank (the keyboard stays offline).
+    var currencyConversion = false
     var theme: KeyboardTheme = .system
     /// What a tap on 123 opens; holding it opens the other one.
     var numberKeyTap: NumberKeyTap = .numpad
@@ -123,6 +179,16 @@ struct KeyboardSettings: Codable, Equatable {
         currency = try c.decodeIfPresent(String.self, forKey: .currency) ?? d.currency
         rowHeight = try c.decodeIfPresent(Double.self, forKey: .rowHeight) ?? d.rowHeight
         autocorrect = try c.decodeIfPresent(Bool.self, forKey: .autocorrect) ?? d.autocorrect
+        autoCapitalize = try c.decodeIfPresent(Bool.self, forKey: .autoCapitalize) ?? d.autoCapitalize
+        capsLock = try c.decodeIfPresent(Bool.self, forKey: .capsLock) ?? d.capsLock
+        periodShortcut = try c.decodeIfPresent(Bool.self, forKey: .periodShortcut) ?? d.periodShortcut
+        characterPreview = try c.decodeIfPresent(Bool.self, forKey: .characterPreview) ?? d.characterPreview
+        haptics = try c.decodeIfPresent(Bool.self, forKey: .haptics) ?? d.haptics
+        hapticStyle = try c.decodeIfPresent(HapticStyle.self, forKey: .hapticStyle) ?? d.hapticStyle
+        hapticStrength = try c.decodeIfPresent(Double.self, forKey: .hapticStrength) ?? d.hapticStrength
+        smartPunctuation = try c.decodeIfPresent(Bool.self, forKey: .smartPunctuation) ?? d.smartPunctuation
+        mathResults = try c.decodeIfPresent(Bool.self, forKey: .mathResults) ?? d.mathResults
+        currencyConversion = try c.decodeIfPresent(Bool.self, forKey: .currencyConversion) ?? d.currencyConversion
         theme = try c.decodeIfPresent(KeyboardTheme.self, forKey: .theme) ?? d.theme
         numberKeyTap = try c.decodeIfPresent(NumberKeyTap.self, forKey: .numberKeyTap) ?? d.numberKeyTap
         letterColors = try c.decodeIfPresent(LetterColors.self, forKey: .letterColors) ?? d.letterColors
@@ -320,4 +386,22 @@ struct DeleteTiming: Codable, Equatable {
 
     static func load() -> DeleteTiming { SharedSettings.load(Self.self, key: key) ?? DeleteTiming() }
     func save() { SharedSettings.save(self, key: Self.key) }
+}
+
+/// How a key tap feels. iOS doesn't let a keyboard set a vibration's length;
+/// these are its tap styles, from a soft long thud to a short sharp click.
+enum HapticStyle: String, Codable, CaseIterable, Identifiable {
+    case soft, light, medium, heavy, rigid
+    var id: Self { self }
+    var name: String { rawValue.capitalized }
+
+    var impact: UIImpactFeedbackGenerator.FeedbackStyle {
+        switch self {
+        case .soft: return .soft
+        case .light: return .light
+        case .medium: return .medium
+        case .heavy: return .heavy
+        case .rigid: return .rigid
+        }
+    }
 }

@@ -214,7 +214,7 @@ private struct KeyPreviews: View {
         ZStack(alignment: .topLeading) {
             Color.clear
             // A long-press menu or flick guide already shows what's selected.
-            if state.popup == nil && state.flickGuide == nil {
+            if state.settings.characterPreview && state.popup == nil && state.flickGuide == nil {
                 ForEach(keys.filter { state.pressedKeys.contains($0.id) }, id: \.id) { geo in
                     if case .text(let s) = geo.key.action, geo.key.flicks.isEmpty, geo.key.units <= 1 {
                         bubble(state.display(s), color: labelColor(for: geo.key, settings: state.settings),
@@ -733,6 +733,10 @@ private struct SuggestionBar: View {
     /// The words, plus the Japanese chip in place of one of them: first when
     /// the typed word isn't English or French, else last.
     private var entries: [(label: String, word: String, isCorrection: Bool, isJapanese: Bool)] {
+        // A sum's result replaces the words: they're about the text before "=".
+        if !state.mathResults.isEmpty {
+            return state.mathResults.enumerated().map { ($0.element.label, $0.element.text, $0.offset == 0, false) }
+        }
         var list = items.map { ($0.label, $0.word, $0.isCorrection, false) }
         guard let chip = state.japaneseChip else { return list }
         if list.count >= 3 {
@@ -813,13 +817,14 @@ private struct SuggestionBar: View {
             ForEach(Array(entries.enumerated()), id: \.offset) { index, item in
                 if index > 0 { Divider().frame(height: 22) }
                 Button {
-                    if item.isJapanese { state.pickJapanese() } else { state.pick(suggestion: item.word) }
+                    if item.isJapanese { state.pickJapanese() }
+                    else if let r = state.mathResults.first(where: { $0.text == item.word }) { state.pickMath(r) }
+                    else { state.pick(suggestion: item.word) }
                 } label: {
-                    Text(item.label)
+                    MorphText(text: item.label)
                         .font(.system(size: item.isJapanese ? 17 : 16,
                                       weight: item.isCorrection ? .semibold : .regular))
                         .foregroundStyle(item.isJapanese ? Color.red : Color.primary)
-                        .lineLimit(1)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
@@ -842,5 +847,73 @@ private struct SuggestionBar: View {
             }
         }
         .padding(.horizontal, 6)
+    }
+}
+
+/// A word that changes like the iOS suggestion bar's: letters the old and new
+/// word share (in order) slide to their new place, the others fade out or in,
+/// in about 0.25 s (iOS measured 0.2 s in a 60 fps recording; a touch slower felt better).
+/// Too wide for its slot, it falls back to a plain truncated Text.
+private struct MorphText: View {
+    let text: String
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            Letters(text: text).fixedSize()
+            Text(text).lineLimit(1)
+        }
+    }
+
+    private struct Letters: View {
+        let text: String
+        @State private var letters: [Letter] = []
+        @State private var nextID = 0
+
+        struct Letter: Identifiable { let id: Int; let char: Character }
+
+        var body: some View {
+            HStack(spacing: 0) {
+                ForEach(letters) { letter in
+                    Text(String(letter.char))
+                        .transition(.opacity)
+                }
+            }
+            .onAppear { letters = fresh(Array(text)) }
+            .onChange(of: text) { _, new in
+                withAnimation(.smooth(duration: 0.25)) { letters = morph(to: Array(new)) }
+            }
+        }
+
+        private func fresh(_ chars: [Character]) -> [Letter] {
+            defer { nextID += chars.count }
+            return chars.enumerated().map { Letter(id: nextID + $0.offset, char: $0.element) }
+        }
+
+        /// New letters keep the identity of the old letters they match in a
+        /// longest common subsequence, so SwiftUI slides them instead of fading.
+        private func morph(to new: [Character]) -> [Letter] {
+            let old = letters
+            let n = old.count, m = new.count
+            var lcs = Array(repeating: Array(repeating: 0, count: m + 1), count: n + 1)
+            for i in stride(from: n - 1, through: 0, by: -1) {
+                for j in stride(from: m - 1, through: 0, by: -1) {
+                    lcs[i][j] = old[i].char == new[j]
+                        ? lcs[i + 1][j + 1] + 1 : max(lcs[i + 1][j], lcs[i][j + 1])
+                }
+            }
+            var result: [Letter] = []
+            var i = 0, j = 0, id = nextID
+            while j < m {
+                if i < n, old[i].char == new[j], lcs[i][j] == lcs[i + 1][j + 1] + 1 {
+                    result.append(old[i]); i += 1; j += 1
+                } else if i < n, lcs[i + 1][j] >= lcs[i][j + 1] {
+                    i += 1
+                } else {
+                    result.append(Letter(id: id, char: new[j])); id += 1; j += 1
+                }
+            }
+            nextID = id
+            return result
+        }
     }
 }

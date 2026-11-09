@@ -82,20 +82,6 @@ enum Layouts {
         [["*"], ["\""], ["'"], [":"], [";"], ["!"], ["?"]],
     ]
 
-    private static let letterRows: [LetterLayout: [String]] = [
-        .qwerty: ["qwertyuiop", "asdfghjkl", "zxcvbnm"],
-        // Colemak's ";" slot holds an apostrophe instead: French and English
-        // need it constantly, and ";" is still one long-press away.
-        .colemak: ["qwfpgjluy'", "arstdhneio", "zxcvbkm"],
-        // French phone AZERTY, with the apostrophe at the end of the bottom row.
-        .azerty: ["azertyuiop", "qsdfghjklm", "wxcvbn'"],
-        // German/Swiss: Z and Y swapped. Umlauts are on long-press (a, o, u).
-        .qwertz: ["qwertzuiop", "asdfghjkl", "yxcvbnm"],
-        // Dvorak as on a hardware keyboard, minus ";" (long-press on '):
-        // the bottom row has 9 letters, so its keys are a little narrower.
-        .dvorak: ["',.pyfgcrl", "aoeuidhtns", "qjkxbmwvz"],
-    ]
-
     // Accents follow the letter. French variants come first because they are
     // the ones typed most here.
     private static let accents: [String: [String]] = [
@@ -129,7 +115,7 @@ enum Layouts {
 
     /// `romaji`: the same keys typing Japanese; ⚙ then leads back to Latin.
     static func letters(_ settings: KeyboardSettings, showGlobe: Bool, romaji: Bool = false) -> [[RowItem]] {
-        let rows = letterRows[settings.layout]!
+        let rows = settings.layout.rows
 
         // Bottom row: 7 letters between 1.5-wide shift and backspace; more
         // letters (Dvorak's 9) shrink everything to fit the 10 units.

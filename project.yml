@@ -12,8 +12,8 @@ settings:
     # Optimized even in Debug: the decoder's per-word loops over the 48k
     # vocabulary run ~5x slower unoptimized, which made typing feel laggy.
     SWIFT_OPTIMIZATION_LEVEL: "-O"
-    MARKETING_VERSION: "0.9.0"
-    CURRENT_PROJECT_VERSION: "52"
+    MARKETING_VERSION: "0.11.0"
+    CURRENT_PROJECT_VERSION: "68"
 packages:
   # azooKey's kana-kanji converter (MIT) with its default dictionary.
   AzooKeyKanaKanjiConverter:
@@ -47,6 +47,9 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDisplayName: TsumuKey
         UILaunchScreen: {}
+        # Daily exchange rates (Currency conversion, off by default).
+        UIBackgroundModes: [fetch]
+        BGTaskSchedulerPermittedIdentifiers: [tsumukey-rates]
         # Lets the keyboard's long-press "settings" option open the app.
         CFBundleURLTypes:
           - CFBundleURLSchemes: [tsumukey]

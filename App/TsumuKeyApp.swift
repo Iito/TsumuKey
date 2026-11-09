@@ -4,6 +4,9 @@ import SwiftUI
 struct TsumuKeyApp: App {
     var body: some Scene {
         WindowGroup { ContentView() }
+            .backgroundTask(.appRefresh(RatesFetcher.taskID)) {
+                await RatesFetcher.refreshIfNeeded()
+            }
     }
 }
 
@@ -14,6 +17,7 @@ struct ContentView: View {
     @State private var settings = KeyboardSettings.load()
     @State private var report = KeyboardReport.load()
     @FocusState private var fieldFocused: Bool
+    @State private var advancedOpen = false
 
     var body: some View {
         NavigationStack {
@@ -25,7 +29,7 @@ struct ContentView: View {
                             Text(report == nil ? "Turn on Full Access" : "Full Access is off")
                                 .font(.headline)
                             Text(report == nil
-                                 ? "Add the TsumuKey keyboard, turn on Allow Full Access, then open the keyboard once (in the field above). Until then it uses default settings."
+                                 ? "Add the TsumuKey keyboard, turn on Allow Full Access, then open the keyboard once (in any app, or Advanced → Try it here). Until then it uses default settings."
                                  : "The keyboard can't read your settings or downloaded models. Settings → General → Keyboard → Keyboards → TsumuKey → Allow Full Access.")
                                 .font(.callout)
                         }
@@ -36,112 +40,20 @@ struct ContentView: View {
                 }
 
                 Section {
-                    Text("1. Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey")
-                    Text("2. Tap TsumuKey in that list and turn on **Allow Full Access**.")
-                    Button("Open Settings") {
-                        if let url = URL(string: UIApplication.openSettingsURLString) {
-                            UIApplication.shared.open(url)
-                        }
-                    }
-                } header: {
-                    InfoHeader("Set up", info: [
-                        "Full Access lets the keyboard read the settings and models this app keeps for it. Without it, the keyboard uses default settings and the built-in model.",
-                        "iOS shows a warning for every keyboard with Full Access. TsumuKey's keyboard never goes online, and nothing you type leaves your phone.",
-                        "iOS doesn't let apps ask for Full Access; it can only be turned on in Settings.",
-                    ])
+                    row("Layouts", "keyboard", .blue, settings.menuLayouts.map(\.name).joined(separator: ", ")) { layoutsPage }
+                    row("Languages & Model", "globe", .indigo, settings.predictionLanguages.map(\.name).joined(separator: ", ")) { modelPage }
                 }
-                .font(.callout)
-                // The keyboard reports each time it opens (drives the Full Access card).
-                .task {
-                    while !Task.isCancelled {
-                        report = KeyboardReport.load()
-                        try? await Task.sleep(for: .seconds(2))
-                    }
-                }
-
-                LayoutList(settings: $settings)
-
-                ModelsSection(settings: $settings)
-
                 Section {
-                    Toggle("Auto-correct", isOn: $settings.autocorrect)
-                    Picker("Japanese keyboard", selection: $settings.japaneseInput) {
-                        ForEach(JapaneseInput.allCases) { Text($0.name).tag($0) }
-                    }
-                    Toggle("Japanese in ABC", isOn: $settings.japaneseInLatin)
-                    Toggle("Number row", isOn: $settings.numberRow)
-                    Picker("Tap 123 for", selection: $settings.numberKeyTap) {
-                        ForEach(NumberKeyTap.allCases) { Text($0.name).tag($0) }
-                    }
-                    Toggle("Show symbols on keys", isOn: $settings.showSymbolHints)
-                    Toggle("Hide-keyboard button", isOn: $settings.hideKeyboardButton)
-                    Picker("Emoji skin tone", selection: $settings.emojiSkinTone) {
-                        ForEach(0..<6) { t in Text(["✋", "✋🏻", "✋🏼", "✋🏽", "✋🏾", "✋🏿"][t]).tag(t) }
-                    }
-                    RowHeightSlider(rowHeight: $settings.rowHeight)
-                    Picker("Quick currency", selection: $settings.currency) {
-                        ForEach(KeyboardSettings.currencies, id: \.self) { Text($0).tag($0) }
-                    }
-                } header: {
-                    InfoHeader("Keyboard", info: [
-                        "Japanese keyboard: かな is the flick pad; ローマ字 types romaji on the letter keys.",
-                        "Japanese in ABC: typing romaji (watashi, arigatou) offers 私, ありがとう in the bar; tap it to swap.",
-                        "Holding 123 opens the other number layout.",
-                        "Long-press still shows symbols when they're hidden on the keys.",
-                        "Hide-keyboard button: a ⌄ at the right end of the suggestion bar, in every app. It always shows in this app's test field.",
-                        "Emoji skin tone applies to the emoji panel and search; long-press an emoji there for the other tones.",
-                        "Quick currency sits on the third key of the middle row (D on QWERTY, S on Colemak, E on Dvorak); long-press it for the others.",
-                    ])
+                    row("Typing", "character.cursor.ibeam", .gray, typingSummary) { typingPage }
+                    row("Suggestion Bar", "sparkles", .orange, barSummary) { barPage }
+                    row("Japanese", "character.ja", .red, settings.japaneseInput.name) { japanesePage }
+                    row("Keys", "square.grid.3x3", .teal, settings.numberRow ? "Number row" : "No number row") { keysPage }
+                    row("Look", "paintpalette", .pink, settings.theme.name) { lookPage }
+                    row("Advanced", "gearshape.2", .gray, settings.haptics ? "Haptics \(settings.hapticStyle.name.lowercased())" : "Haptics off") { advancedPageFramed }
                 }
-
-
                 Section {
-                    Picker("Theme", selection: $settings.theme) {
-                        ForEach(KeyboardTheme.allCases) { Text($0.name).tag($0) }
-                    }
-                    Picker("Letter colours", selection: $settings.letterColors.scheme) {
-                        ForEach(LetterScheme.allCases) { Text($0.name).tag($0) }
-                    }
-                    switch settings.letterColors.scheme {
-                    case .none:
-                        EmptyView()
-                    case .all:
-                        ColorRow(title: "All keys", hex: $settings.letterColors.all)
-                    case .rows:
-                        ColorRow(title: "Top row", hex: $settings.letterColors.topRow)
-                        ColorRow(title: "Middle row", hex: $settings.letterColors.middleRow)
-                        ColorRow(title: "Bottom row", hex: $settings.letterColors.bottomRow)
-                    case .thumbs:
-                        ColorRow(title: "Left thumb", hex: $settings.letterColors.leftThumb)
-                        ColorRow(title: "Right thumb", hex: $settings.letterColors.rightThumb)
-                    }
-                    HStack {
-                        Toggle("Vowels", isOn: $settings.letterColors.vowelsOn)
-                        if settings.letterColors.vowelsOn {
-                            ColorRow(title: "Vowels", hex: $settings.letterColors.vowels).labelsHidden()
-                        }
-                    }
-                } header: {
-                    InfoHeader("Look", info: [
-                        "Pick one letter colour scheme: all keys, by row, or by thumb.",
-                        "Vowels can be coloured on top of any scheme.",
-                    ])
-                }
-
-                Section {
-                    TimingSlider(title: "Hold before repeating", value: $timing.holdDelay, range: 0.2...0.8)
-                    TimingSlider(title: "Character repeat speed", value: $timing.charRepeat, range: 0.02...0.15)
-                    TimingSlider(title: "Word repeat speed", value: $timing.wordRepeat, range: 0.15...0.7)
-                    TimingSlider(title: "Time to chain taps", value: $timing.multiTapWindow, range: 0.15...0.6)
-                    Button("Reset to defaults") { timing = DeleteTiming() }
-                } header: {
-                    InfoHeader("Delete key", info: [
-                        "Tap: one character.",
-                        "Hold: characters, repeating.",
-                        "Tap then hold: one word.",
-                        "Double tap then hold: word after word.",
-                        "Lower numbers are faster.",
-                    ])
+                    row("Set Up", "checkmark.shield", .green,
+                        report?.fullAccess == true ? "Full Access on" : "Full Access off") { setUpPage }
                 }
 
                 // Version at the very bottom; matches the entries in CHANGELOG.md.
@@ -152,12 +64,29 @@ struct ContentView: View {
                 }
             }
             .navigationTitle("TsumuKey")
-            // The test field is pinned above the list, not inside it: iOS scrolls a
-            // list back to its focused field whenever the keyboard changes height
-            // (key height, number row), which jumped away from the setting being changed.
-            .safeAreaInset(edge: .top, spacing: 0) { tryItHere }
+            // Fits on one screen: no scrolling or bounce. It still scrolls when it
+            // doesn't fit (small phones, large text, the Full Access card).
+            .scrollBounceBehavior(.basedOnSize)
+            // The keyboard reports each time it opens (drives the Full Access card).
+            .task {
+                while !Task.isCancelled {
+                    report = KeyboardReport.load()
+                    try? await Task.sleep(for: .seconds(2))
+                }
+            }
+            // UI tests (-autofocus) start on Advanced, where the test field is.
+            .navigationDestination(isPresented: $advancedOpen) { advancedPageFramed }
             .onChange(of: timing) { _, new in new.save() }
-            .onChange(of: settings) { _, new in new.save() }
+            .onChange(of: settings) { old, new in
+                new.save()
+                guard old.currencyConversion != new.currencyConversion else { return }
+                if new.currencyConversion {
+                    Task { await RatesFetcher.fetch(); RatesFetcher.schedule() }
+                } else {
+                    CurrencyRates.clear()
+                    RatesFetcher.schedule()
+                }
+            }
             // The keyboard can change the layout too (long-press its settings key), so
             // re-read whenever the app comes back to the front.
             .onChange(of: fieldFocused) { _, focused in SharedSettings.setInAppField(focused) }
@@ -167,6 +96,7 @@ struct ContentView: View {
                 guard phase == .active else { return }
                 let latest = KeyboardSettings.load()
                 if latest != settings { settings = latest }
+                Task { await RatesFetcher.refreshIfNeeded() }
             }
             // Lets simulator runs and UI tests open the keyboard without a tap.
             .task {
@@ -199,34 +129,10 @@ struct ContentView: View {
                    let m = CorrectionModel(rawValue: name) { settings.correctionModel = m; settings.save() }
                 Bench.runIfRequested()
                 guard ProcessInfo.processInfo.arguments.contains("-autofocus") else { return }
+                advancedOpen = true
                 // Focusing during the first layout pass is ignored; wait a moment.
                 try? await Task.sleep(for: .milliseconds(500))
                 fieldFocused = true
-            }
-        }
-    }
-}
-
-/// Row in the main settings that opens the layout list, like iOS's
-/// Settings → Keyboards → Keyboards.
-private struct LayoutList: View {
-    @Binding var settings: KeyboardSettings
-
-    var body: some View {
-        Section {
-            NavigationLink {
-                OrderedListPage(title: "Layouts",
-                                items: $settings.menuLayouts, all: LetterLayout.allCases,
-                                name: \.name, limit: KeyboardSettings.maxMenuLayouts, firstNote: "Default",
-                                topAction: "Make Default",
-                                info: ["Up to \(KeyboardSettings.maxMenuLayouts) layouts. The first one is the default: the keyboard opens on it.",
-                                       "Hold the ⚙︎ key on the keyboard to switch between them. The Japanese keyboard is always in that menu too."])
-                    .onChange(of: settings.menuLayouts) { _, list in
-                        // The keyboard opens on the top layout.
-                        if let first = list.first, first != settings.layout { settings.layout = first }
-                    }
-            } label: {
-                LabeledContent("Layouts", value: settings.menuLayouts.map(\.name).joined(separator: ", "))
             }
         }
     }
@@ -245,6 +151,8 @@ struct OrderedListPage<Item: Identifiable & Hashable>: View {
     let firstNote: String?
     let topAction: String
     let info: [String]
+    /// Optional picture of an item (a layout's keys), shown when its row is held.
+    var preview: ((Item) -> AnyView)? = nil
 
     private var rest: [Item] { all.filter { !items.contains($0) } }
 
@@ -265,18 +173,23 @@ struct OrderedListPage<Item: Identifiable & Hashable>: View {
                     }
                     .swipeActions(edge: .leading) {
                         if item != items.first {
-                            Button(topAction) {
-                                items.removeAll { $0 == item }
-                                items.insert(item, at: 0)
-                            }
-                            .tint(.blue)
+                            Button(topAction) { moveToTop(item) }
+                                .tint(.blue)
                         }
                     }
+                    .modifier(HoldPreview(preview: preview.map { p in { previewCard(item, p) } }) {
+                        if item != items.first {
+                            Button(topAction, systemImage: "arrow.up.to.line") { moveToTop(item) }
+                        }
+                        if items.count > 1 {
+                            Button("Remove", systemImage: "minus.circle", role: .destructive) { items.removeAll { $0 == item } }
+                        }
+                    })
                 }
             } header: {
                 Text("In use")
             } footer: {
-                Text("Swipe left to remove, right to \(topAction.lowercased()).")
+                Text("Swipe left to remove, right to \(topAction.lowercased()).\(preview == nil ? "" : " Hold one to see it.")")
             }
 
             if !rest.isEmpty {
@@ -292,6 +205,10 @@ struct OrderedListPage<Item: Identifiable & Hashable>: View {
                             }
                         }
                         .disabled(items.count >= limit)
+                        .modifier(HoldPreview(preview: preview.map { p in { previewCard(item, p) } }) {
+                            Button("Add", systemImage: "plus.circle") { items.append(item) }
+                                .disabled(items.count >= limit)
+                        })
                     }
                 } header: {
                     Text("Add")
@@ -299,10 +216,41 @@ struct OrderedListPage<Item: Identifiable & Hashable>: View {
                     if items.count >= limit { Text("Up to \(limit). Remove one to add another.") }
                 }
             }
+
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { InfoButton(title: title, info: info) }
+    }
+
+    private func moveToTop(_ item: Item) {
+        items.removeAll { $0 == item }
+        items.insert(item, at: 0)
+    }
+
+    /// What a held row shows: its name over the picture, at a fixed width
+    /// (the context menu preview has no width of its own).
+    private func previewCard(_ item: Item, _ preview: (Item) -> AnyView) -> AnyView {
+        AnyView(VStack(alignment: .leading, spacing: 10) {
+            Text(item[keyPath: name]).font(.headline)
+            preview(item)
+        }
+        .padding(16)
+        .frame(width: 340))
+    }
+}
+
+/// Long-press menu with a preview, only when there's a preview to show.
+private struct HoldPreview<Actions: View>: ViewModifier {
+    let preview: (() -> AnyView)?
+    @ViewBuilder let actions: () -> Actions
+
+    func body(content: Content) -> some View {
+        if let preview {
+            content.contextMenu { actions() } preview: { preview() }
+        } else {
+            content
+        }
     }
 }
 
@@ -378,6 +326,270 @@ extension ContentView {
     }
 }
 
+// MARK: Settings pages
+// Each group of settings is its own page, like iOS Settings, so the main page
+// stays a short list. The "Try it here" field is on Advanced only.
+extension ContentView {
+    /// A main-page row: coloured icon, title, a short summary, and its page.
+    private func row<Page: View>(_ title: String, _ symbol: String, _ color: Color, _ summary: String,
+                                 @ViewBuilder page: @escaping () -> Page) -> some View {
+        NavigationLink {
+            page()
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+        } label: {
+            Label {
+                LabeledContent(title, value: summary)
+            } icon: {
+                Image(systemName: symbol)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 29, height: 29)
+                    .background(color.gradient, in: RoundedRectangle(cornerRadius: 7))
+            }
+        }
+    }
+
+    private var typingSummary: String {
+        let toggles = [settings.autocorrect, settings.autoCapitalize, settings.capsLock,
+                       settings.periodShortcut, settings.smartPunctuation, settings.characterPreview]
+        let off = toggles.filter { !$0 }.count
+        return off == 0 ? "All on" : "\(off) off"
+    }
+
+    private var barSummary: String {
+        let on = [settings.mathResults ? "Maths" : nil, settings.currencyConversion ? "Currency" : nil].compactMap { $0 }
+        return on.isEmpty ? "Words only" : on.joined(separator: ", ")
+    }
+
+    private var layoutsPage: some View {
+        OrderedListPage(title: "Layouts",
+                        items: $settings.menuLayouts, all: LetterLayout.allCases,
+                        name: \.name, limit: KeyboardSettings.maxMenuLayouts, firstNote: "Default",
+                        topAction: "Make Default",
+                        info: ["Up to \(KeyboardSettings.maxMenuLayouts) layouts. The first one is the default: the keyboard opens on it.",
+                               "Hold the ⚙︎ key on the keyboard to switch between them. The Japanese keyboard is always in that menu too.",
+                               "Hold a layout here to see its keys."],
+                        preview: { AnyView(LayoutPreview(layout: $0)) })
+            .onChange(of: settings.menuLayouts) { _, list in
+                // The keyboard opens on the top layout.
+                if let first = list.first, first != settings.layout { settings.layout = first }
+            }
+    }
+
+    private var modelPage: some View {
+        Form { ModelsSection(settings: $settings) }
+    }
+
+    private var typingPage: some View {
+        Form {
+            Section {
+                Toggle("Auto-correct", isOn: $settings.autocorrect)
+                Toggle("Auto-capitalisation", isOn: $settings.autoCapitalize)
+                Toggle("Caps lock", isOn: $settings.capsLock)
+                Toggle("\u{201C}.\u{201D} shortcut", isOn: $settings.periodShortcut)
+                Toggle("Smart punctuation", isOn: $settings.smartPunctuation)
+                Toggle("Character preview", isOn: $settings.characterPreview)
+            } header: {
+                InfoHeader("Typing", info: [
+                    "Like the iOS keyboard settings, which iOS doesn't share with other keyboards.",
+                    "Auto-correct stays off in fields that ask for none (web addresses, email, code).",
+                    "Caps lock: double-tap shift.",
+                    "\u{201C}.\u{201D} shortcut: double-tap space after a word types a full stop and a space.",
+                    "Smart punctuation: curly quotes and apostrophes (don\u{2019}t), and -- becomes \u{2014}.",
+                    "Character preview: the letter shows above the key you press.",
+                ])
+            }
+        }
+    }
+
+    private var barPage: some View {
+        Form {
+            Section {
+                Toggle("Maths results", isOn: $settings.mathResults)
+                Toggle("Currency conversion", isOn: $settings.currencyConversion)
+            } header: {
+                InfoHeader("In the Suggestion Bar", info: [
+                    "Maths results: type a sum and = (12*3=, (4+5)/2 =) and the result shows in the bar; tap it to type it.",
+                    "Currency conversion: an amount with $ \u{20AC} \u{00A3} \u{00A5} (100\u{20AC}, $20) shows it in the three main other currencies; tap one to swap. \u{201C}100 usd in chf=\u{201D} converts to any currency the European Central Bank lists.",
+                    "Rates: the app fetches the European Central Bank's daily rates, about once a day, only while this is on. The keyboard stays offline. Turning it off deletes the rates.",
+                ])
+            } footer: {
+                if settings.currencyConversion, let rates = CurrencyRates.load() {
+                    Text("Rates from \(rates.date.formatted(date: .abbreviated, time: .omitted)).")
+                } else if settings.currencyConversion {
+                    Text("No rates yet: they download when you're online.")
+                }
+            }
+        }
+    }
+
+    private var japanesePage: some View {
+        Form {
+            Section {
+                Picker("Japanese keyboard", selection: $settings.japaneseInput) {
+                    ForEach(JapaneseInput.allCases) { Text($0.name).tag($0) }
+                }
+                Toggle("Japanese in ABC", isOn: $settings.japaneseInLatin)
+            } header: {
+                InfoHeader("Japanese", info: [
+                    "Japanese keyboard: かな is the flick pad; ローマ字 types romaji on the letter keys.",
+                    "Japanese in ABC: typing romaji (watashi, arigatou) offers 私, ありがとう in the bar; tap it to swap.",
+                ])
+            }
+        }
+    }
+
+    private var keysPage: some View {
+        Form {
+            Section {
+                Toggle("Number row", isOn: $settings.numberRow)
+                Picker("Tap 123 for", selection: $settings.numberKeyTap) {
+                    ForEach(NumberKeyTap.allCases) { Text($0.name).tag($0) }
+                }
+                Toggle("Show symbols on keys", isOn: $settings.showSymbolHints)
+                Picker("Quick currency", selection: $settings.currency) {
+                    ForEach(KeyboardSettings.currencies, id: \.self) { Text($0).tag($0) }
+                }
+                Picker("Emoji skin tone", selection: $settings.emojiSkinTone) {
+                    ForEach(0..<6) { t in Text(["✋", "✋🏻", "✋🏼", "✋🏽", "✋🏾", "✋🏿"][t]).tag(t) }
+                }
+            } header: {
+                InfoHeader("Keys", info: [
+                    "Holding 123 opens the other number layout.",
+                    "Long-press still shows symbols when they're hidden on the keys.",
+                    "Quick currency sits on the third key of the middle row (D on QWERTY, S on Colemak, E on Dvorak); long-press it for the others.",
+                    "Emoji skin tone applies to the emoji panel and search; long-press an emoji there for the other tones.",
+                ])
+            }
+        }
+    }
+
+    private var lookPage: some View {
+        Form {
+            Section {
+                Picker("Theme", selection: $settings.theme) {
+                    ForEach(KeyboardTheme.allCases) { Text($0.name).tag($0) }
+                }
+                Picker("Letter colours", selection: $settings.letterColors.scheme) {
+                    ForEach(LetterScheme.allCases) { Text($0.name).tag($0) }
+                }
+                switch settings.letterColors.scheme {
+                case .none:
+                    EmptyView()
+                case .all:
+                    ColorRow(title: "All keys", hex: $settings.letterColors.all)
+                case .rows:
+                    ColorRow(title: "Top row", hex: $settings.letterColors.topRow)
+                    ColorRow(title: "Middle row", hex: $settings.letterColors.middleRow)
+                    ColorRow(title: "Bottom row", hex: $settings.letterColors.bottomRow)
+                case .thumbs:
+                    ColorRow(title: "Left thumb", hex: $settings.letterColors.leftThumb)
+                    ColorRow(title: "Right thumb", hex: $settings.letterColors.rightThumb)
+                }
+                HStack {
+                    Toggle("Vowels", isOn: $settings.letterColors.vowelsOn)
+                    if settings.letterColors.vowelsOn {
+                        ColorRow(title: "Vowels", hex: $settings.letterColors.vowels).labelsHidden()
+                    }
+                }
+            } header: {
+                InfoHeader("Look", info: [
+                    "Pick one letter colour scheme: all keys, by row, or by thumb.",
+                    "Vowels can be coloured on top of any scheme.",
+                ])
+            }
+        }
+    }
+
+    /// The test field is pinned above the list, not inside it: iOS scrolls a
+    /// list back to its focused field whenever the keyboard changes height
+    /// (key height, number row), which jumped away from the setting being changed.
+    private var advancedPageFramed: some View {
+        advancedPage
+            .navigationTitle("Advanced")
+            .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .top, spacing: 0) { tryItHere }
+    }
+
+    private var advancedPage: some View {
+        Form {
+            Section {
+                Toggle("Haptic feedback", isOn: $settings.haptics)
+                if settings.haptics {
+                    Picker("Feel", selection: $settings.hapticStyle) {
+                        ForEach(HapticStyle.allCases) { Text($0.name).tag($0) }
+                    }
+                    VStack(alignment: .leading) {
+                        Text("Strength")
+                        Slider(value: $settings.hapticStrength, in: 0.2...1) { editing in
+                            if !editing { playHaptic() }
+                        }
+                    }
+                }
+            } header: {
+                InfoHeader("Haptics", info: [
+                    "A small vibration on every key tap, and a tick for flick and cursor moves.",
+                    "Feel: Soft is a long gentle thud, Rigid a short sharp click; iOS doesn't let keyboards set the length directly.",
+                    "Haptics need Full Access, and follow iPhone's System Haptics setting (Settings → Sounds & Haptics).",
+                ])
+            }
+            .onChange(of: settings.hapticStyle) { _, _ in playHaptic() }
+
+            Section {
+                RowHeightSlider(rowHeight: $settings.rowHeight)
+                Toggle("Hide-keyboard button", isOn: $settings.hideKeyboardButton)
+            } header: {
+                InfoHeader("Keyboard", info: [
+                    "Key height: the height of one row of keys.",
+                    "Hide-keyboard button: a ⌄ at the right end of the suggestion bar, in every app. It always shows in this app's test field.",
+                ])
+            }
+
+            Section {
+                TimingSlider(title: "Hold before repeating", value: $timing.holdDelay, range: 0.2...0.8)
+                TimingSlider(title: "Character repeat speed", value: $timing.charRepeat, range: 0.02...0.15)
+                TimingSlider(title: "Word repeat speed", value: $timing.wordRepeat, range: 0.15...0.7)
+                TimingSlider(title: "Time to chain taps", value: $timing.multiTapWindow, range: 0.15...0.6)
+                Button("Reset to defaults") { timing = DeleteTiming() }
+            } header: {
+                InfoHeader("Delete Key", info: [
+                    "Tap: one character.",
+                    "Hold: characters, repeating.",
+                    "Tap then hold: one word.",
+                    "Double tap then hold: word after word.",
+                    "Lower numbers are faster.",
+                ])
+            }
+        }
+    }
+
+    /// Lets you feel the chosen style and strength in the app.
+    private func playHaptic() {
+        let g = UIImpactFeedbackGenerator(style: settings.hapticStyle.impact)
+        g.impactOccurred(intensity: settings.hapticStrength)
+    }
+
+    private var setUpPage: some View {
+        Form {
+            Section {
+                Text("1. Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey")
+                Text("2. Tap TsumuKey in that list and turn on **Allow Full Access**.")
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                }
+            } header: {
+                InfoHeader("Set up", info: [
+                    "Full Access lets the keyboard read the settings and models this app keeps for it. Without it, the keyboard uses default settings and the built-in model.",
+                    "iOS shows a warning for every keyboard with Full Access. TsumuKey's keyboard never goes online, and nothing you type leaves your phone.",
+                    "iOS doesn't let apps ask for Full Access; it can only be turned on in Settings.",
+                ])
+            }
+            .font(.callout)
+        }
+    }
+}
+
 /// Key height applies when the slider is let go, not on every step: each
 /// change resizes an open keyboard.
 private struct RowHeightSlider: View {
@@ -415,5 +627,54 @@ private struct TimingSlider: View {
             }
             Slider(value: $value, in: range, step: 0.01)
         }
+    }
+}
+
+/// A layout's three letter rows drawn as small keys, laid out like the
+/// keyboard: 10 units wide, short rows centred, shift and delete beside the
+/// bottom row.
+struct LayoutPreview: View {
+    let layout: LetterLayout
+
+    var body: some View {
+        GeometryReader { geo in
+            let unit = geo.size.width / 10
+            VStack(spacing: 4) {
+                ForEach(Array(layout.rows.enumerated()), id: \.offset) { index, row in
+                    let letters = row.map { String($0).uppercased() }
+                    if index < 2 {
+                        HStack(spacing: 0) {
+                            ForEach(Array(letters.enumerated()), id: \.offset) { _, l in key(l, width: unit) }
+                        }
+                    } else {
+                        // Same rule as the keyboard: 1.5-unit shift and delete, or
+                        // 1 unit when the row has more than 7 letters.
+                        let edge: CGFloat = letters.count > 7 ? 1 : 1.5
+                        let width = min(1, (10 - 2 * edge) / CGFloat(letters.count)) * unit
+                        HStack(spacing: 0) {
+                            key("⇧", width: edge * unit, dim: true)
+                            Spacer(minLength: 0)
+                            ForEach(Array(letters.enumerated()), id: \.offset) { _, l in key(l, width: width) }
+                            Spacer(minLength: 0)
+                            key("⌫", width: edge * unit, dim: true)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .frame(height: 3 * 30 + 2 * 4)
+        .accessibilityElement()
+        .accessibilityLabel(layout.rows.joined(separator: ", "))
+    }
+
+    private func key(_ label: String, width: CGFloat, dim: Bool = false) -> some View {
+        Text(label)
+            .font(.system(size: 13, weight: .medium))
+            .frame(width: max(width - 3, 0), height: 30)
+            .background(dim ? Color(.systemGray4) : Color(.systemBackground),
+                        in: RoundedRectangle(cornerRadius: 5))
+            .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(Color(.separator), lineWidth: 0.5))
+            .frame(width: width)
     }
 }

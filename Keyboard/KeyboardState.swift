@@ -162,7 +162,7 @@ final class KeyboardState: ObservableObject {
     private func nextCandidate() {
         guard !candidates.isEmpty else { return }
         kanaSelected = ((kanaSelected ?? -1) + 1) % candidates.count
-        selectionFeedback.selectionChanged()
+        tick()
         updateComposition(requestCandidates: false)
     }
 
@@ -257,12 +257,23 @@ final class KeyboardState: ObservableObject {
     private var lateFixCount = 0
 
     // Haptics need Full Access; without it iOS silently ignores them.
-    private let tapFeedback = UIImpactFeedbackGenerator(style: .light)
+    private var tapFeedback = UIImpactFeedbackGenerator(style: .light)
+    private var tapStyle = HapticStyle.light
     private let selectionFeedback = UISelectionFeedbackGenerator()
 
     func keyDown() {
-        tapFeedback.impactOccurred()
+        guard settings.haptics else { return }
+        if settings.hapticStyle != tapStyle {
+            tapStyle = settings.hapticStyle
+            tapFeedback = UIImpactFeedbackGenerator(style: tapStyle.impact)
+        }
+        tapFeedback.impactOccurred(intensity: settings.hapticStrength)
         tapFeedback.prepare()
+    }
+
+    /// The small tick for flick and cursor moves, off with haptics.
+    private func tick() {
+        if settings.haptics { selectionFeedback.selectionChanged() }
     }
     var keyboardWidth: CGFloat = 0
     var keyboardHeight: CGFloat = 0
@@ -272,7 +283,7 @@ final class KeyboardState: ObservableObject {
         let guide = FlickGuide(options: options, key: key, selected: selected, full: full)
         guard guide != flickGuide else { return }
         flickGuide = guide
-        selectionFeedback.selectionChanged()
+        tick()
     }
 
     private var lastShiftTap = Date.distantPast
@@ -291,11 +302,39 @@ final class KeyboardState: ObservableObject {
     }
 
     func insert(_ s: String) {
+        let s = smartened(s)
         lastCorrection = nil
         lateFix?.tail += s
         TouchLog.log("INSERT \"\(s == " " ? "␣" : s)\"")
         proxy?.insertText(s)
         textChanged()
+    }
+
+    /// Smart punctuation, like the iOS keyboard: straight quotes become curly
+    /// (opening after a space or bracket, closing otherwise, so "don't" gets
+    /// ’), and a second "-" turns "--" into "—". Off in Japanese, and where
+    /// the text field asks for straight quotes or plain dashes.
+    private func smartened(_ s: String) -> String {
+        guard settings.smartPunctuation, !mode.isJapanese, let proxy else { return s }
+        let quotes = proxy.smartQuotesType != .no
+        if s == "-", proxy.smartDashesType != .no, textBefore.hasSuffix("-") {
+            proxy.deleteBackward()
+            if let tail = lateFix?.tail { lateFix?.tail = String(tail.dropLast()) }
+            return "\u{2014}"
+        }
+        guard quotes, s.contains(where: { $0 == "'" || $0 == "\"" }) else { return s }
+        var prev = textBefore.last
+        var out = ""
+        for c in s {
+            var c2 = c
+            if c == "'" || c == "\"" {
+                let opening = prev.map { $0.isWhitespace || "([{<«“‘—–/".contains($0) } ?? true
+                if c == "'" { c2 = opening ? "\u{2018}" : "\u{2019}" } else { c2 = opening ? "\u{201C}" : "\u{201D}" }
+            }
+            out.append(c2)
+            prev = c2
+        }
+        return out
     }
 
     /// Types `s` from a key; spaces and punctuation apply the pending correction first.
@@ -332,7 +371,7 @@ final class KeyboardState: ObservableObject {
     /// Applies a correction that's already known: one the bar computed for
     /// exactly this word, or a missing apostrophe.
     private func applyCorrection(_ word: String) -> (original: String, corrected: String)? {
-        guard !word.isEmpty, mode == .letters, settings.autocorrect, rejectedWord == nil else { return nil }
+        guard !word.isEmpty, mode == .letters, autocorrectOn, rejectedWord == nil else { return nil }
         // English "i" (and i'm, i'll…) is always capitalized, even if it was once
         // learned by undoing the fix: learned words only protect real words.
         let pronoun = Suggester.pronounI(for: word)
@@ -358,7 +397,7 @@ final class KeyboardState: ObservableObject {
 
     /// Typing outran the bar: the model hasn't seen this word yet.
     private func needsLateFix(_ word: String) -> Bool {
-        word.count >= 2 && mode == .letters && settings.autocorrect && rejectedWord == nil
+        word.count >= 2 && mode == .letters && autocorrectOn && rejectedWord == nil
             && !isKnown(word) && predictor.isReady && correctionWord != word
     }
 
@@ -476,7 +515,7 @@ final class KeyboardState: ObservableObject {
         defer { lastSpaceTap = now }
         // Double-tap space after a word types ". "
         let before = textBefore
-        if now.timeIntervalSince(lastSpaceTap) < 0.4, before.hasSuffix(" "),
+        if settings.periodShortcut, now.timeIntervalSince(lastSpaceTap) < 0.4, before.hasSuffix(" "),
            let prev = before.dropLast().last, prev.isLetter || prev.isNumber {
             proxy?.deleteBackward()
             insert(". ")
@@ -497,7 +536,7 @@ final class KeyboardState: ObservableObject {
         defer { lastShiftTap = now }
         switch shift {
         case .locked: shift = .off
-        case .on where now.timeIntervalSince(lastShiftTap) < 0.3: shift = .locked
+        case .on where settings.capsLock && now.timeIntervalSince(lastShiftTap) < 0.3: shift = .locked
         case .on: shift = .off
         case .off: shift = .on
         }
@@ -604,7 +643,7 @@ final class KeyboardState: ObservableObject {
             // The apostrophe too: it's part of words (l'ami, don't), and a
             // slip onto it mid-word ("kn'w") needs its position to be fixed.
             if s.count == 1, let letter = s.lowercased().first, letter.isLetter || letter == "'" {
-                taps.append(Tap(letter: letter, point: point))
+                taps.append(Self.tap(letter, at: point))
             }
             type(display(s))
         case .shift: tapShift()
@@ -695,7 +734,7 @@ final class KeyboardState: ObservableObject {
         popup = Popup(options: shown, frame: CGRect(x: x, y: y, width: width, height: height),
                       selected: selected, cellWidth: cellWidth, vertical: vertical, cellHeight: cellHeight,
                       menu: menu, checked: checked)
-        selectionFeedback.selectionChanged()
+        tick()
     }
 
     /// `point` in keyboard coordinates.
@@ -707,8 +746,16 @@ final class KeyboardState: ObservableObject {
         p.selected = min(max(0, index), p.options.count - 1)
         if p != popup {
             popup = p
-            selectionFeedback.selectionChanged()
+            tick()
         }
+    }
+
+    /// The corrector knows a-z only: an accented letter (a Bépo é key, or
+    /// one picked by long-press) counts as its plain letter, typed exactly.
+    private static func tap(_ letter: Character, at point: CGPoint?) -> Tap {
+        guard !letter.isASCII, let plain = String(letter).folding(options: .diacriticInsensitive, locale: nil).first,
+              plain.isASCII else { return Tap(letter: letter, point: point) }
+        return Tap(letter: plain, point: nil)
     }
 
     func commitPopup() {
@@ -717,7 +764,7 @@ final class KeyboardState: ObservableObject {
         switch p.options[p.selected] {
         case .text(let s):
             if s.count == 1, let letter = s.lowercased().first, letter.isLetter || letter == "'" {
-                taps.append(Tap(letter: letter, point: nil))
+                taps.append(Self.tap(letter, at: nil))
             }
             commitComposition()
             type(s)
@@ -758,7 +805,7 @@ final class KeyboardState: ObservableObject {
             ? String((proxy.documentContextBeforeInput ?? "").suffix(-offset))
             : String((proxy.documentContextAfterInput ?? "").prefix(offset))
         proxy.adjustTextPosition(byCharacterOffset: offset)
-        if passed.contains(where: \.isWhitespace) { selectionFeedback.selectionChanged() }
+        if passed.contains(where: \.isWhitespace) { tick() }
         // Whatever was being typed is no longer under the cursor.
         taps = []
         lateFix = nil
@@ -772,7 +819,33 @@ final class KeyboardState: ObservableObject {
 
     /// Cheap per-keystroke work only; the bar refresh runs on the next
     /// run-loop turn and its model work off the main thread.
+    /// The result of a sum or a currency conversion typed before "=", for
+    /// the bar: what it shows, and what a tap types.
+    /// `replace`: characters a tap swaps for `text` ("100€" → "$111.65"); 0
+    /// after "=", where the result is added.
+    struct BarResult: Equatable { var label: String; var text: String; var replace = 0 }
+    @Published private(set) var mathResults: [BarResult] = []
+
+    func pickMath(_ result: BarResult) {
+        mathResults = []
+        taps = []
+        for _ in 0..<result.replace { proxy?.deleteBackward() }
+        insert(result.text)
+    }
+
     func textChanged() {
+        var math: [BarResult] = []
+        if !mode.isJapanese, textBefore.hasSuffix("=") || textBefore.hasSuffix("= ") {
+            let before = textBefore.trimmingCharacters(in: .whitespaces)
+            if settings.currencyConversion, let r = CurrencyResult.result(for: before) {
+                math = [BarResult(label: r.label, text: r.text)]
+            } else if settings.mathResults, let r = MathResult.result(for: before) {
+                math = [BarResult(label: r, text: r)]
+            }
+        } else if !mode.isJapanese, settings.currencyConversion, let q = CurrencyResult.quick(for: textBefore) {
+            math = q.results.map { BarResult(label: $0, text: $0, replace: q.replace) }
+        }
+        if math != mathResults { mathResults = math }
         let word = currentWord
         if word != rejectedWord { rejectedWord = nil }
         if word.isEmpty { taps = [] }
@@ -822,7 +895,7 @@ final class KeyboardState: ObservableObject {
             return
         }
         let request = DecodeRequest(before: String(textBefore.dropLast(word.count)), word: word, taps: taps,
-                                    keys: keyMap, autocorrect: settings.autocorrect && rejectedWord == nil && !isKnown(word))
+                                    keys: keyMap, autocorrect: autocorrectOn && rejectedWord == nil && !isKnown(word))
         // Mid-word this is the quick estimate only; the full check runs once
         // the word is finished (see `requestLateFix`).
         correctionWord = nil
@@ -835,7 +908,13 @@ final class KeyboardState: ObservableObject {
     }
 
     private func correction(for word: String) -> String? {
-        settings.autocorrect && rejectedWord == nil && !isKnown(word) ? Suggester.autocorrection(for: word) : nil
+        autocorrectOn && rejectedWord == nil && !isKnown(word) ? Suggester.autocorrection(for: word) : nil
+    }
+
+    /// The setting, unless the text field asks for no autocorrection
+    /// (URLs, email addresses, code, search fields in some apps).
+    private var autocorrectOn: Bool {
+        settings.autocorrect && proxy?.autocorrectionType != .no
     }
 
     private func updateAutoShift() {
@@ -847,7 +926,7 @@ final class KeyboardState: ObservableObject {
         }
         let before = textBefore
         let wantsCap: Bool
-        switch proxy.autocapitalizationType ?? .sentences {
+        switch settings.autoCapitalize ? proxy.autocapitalizationType ?? .sentences : .none {
         case .none: wantsCap = false
         case .allCharacters: wantsCap = true
         case .words: wantsCap = before.isEmpty || before.last?.isWhitespace == true

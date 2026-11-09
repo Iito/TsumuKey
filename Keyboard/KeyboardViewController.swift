@@ -95,6 +95,7 @@ final class KeyboardViewController: UIInputViewController {
     /// changes them (Darwin notification, see startWatchingSettings).
     private func applySettings() {
         let settings = KeyboardSettings.load()
+        CurrencyResult.rates = settings.currencyConversion ? CurrencyRates.load() : nil
         if settings != state.settings { state.settings = settings }
         heightConstraint?.constant = Metrics.totalHeight(settings)
         // Day/night: the key colours are dynamic, so overriding the style
@@ -104,29 +105,39 @@ final class KeyboardViewController: UIInputViewController {
         state.loadEngines()
     }
 
+    /// Darwin callbacks get this box, not the controller: it only points to the
+    /// controller weakly, so a notification that lands while iOS tears the
+    /// keyboard down finds nil instead of freed memory.
+    private final class Observer {
+        weak var controller: KeyboardViewController?
+        init(_ controller: KeyboardViewController) { self.controller = controller }
+    }
+    private lazy var observer = Observer(self)
+
     private func startWatchingSettings() {
-        let me = Unmanaged.passUnretained(self).toOpaque()
-        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), me, { _, observer, _, _, _ in
-            guard let observer else { return }
-            let vc = Unmanaged<KeyboardViewController>.fromOpaque(observer).takeUnretainedValue()
-            DispatchQueue.main.async {
-                guard vc.viewIfLoaded?.window != nil else { return }  // reread on next appear instead
+        let box = Unmanaged.passUnretained(observer).toOpaque()
+        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), box, { _, box, _, _, _ in
+            guard let box else { return }
+            let observer = Unmanaged<Observer>.fromOpaque(box).takeUnretainedValue()
+            DispatchQueue.main.async { [weak observer] in
+                guard let vc = observer?.controller,
+                      vc.viewIfLoaded?.window != nil else { return }  // reread on next appear instead
                 vc.applySettings()
                 vc.state.textChanged()
             }
         }, SharedSettings.changed, nil, .deliverImmediately)
-        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), me, { _, observer, _, _, _ in
-            guard let observer else { return }
-            let vc = Unmanaged<KeyboardViewController>.fromOpaque(observer).takeUnretainedValue()
-            DispatchQueue.main.async {
-                vc.state.inAppField = SharedSettings.defaults.bool(forKey: SharedSettings.inAppFieldKey)
+        CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(), box, { _, box, _, _, _ in
+            guard let box else { return }
+            let observer = Unmanaged<Observer>.fromOpaque(box).takeUnretainedValue()
+            DispatchQueue.main.async { [weak observer] in
+                observer?.controller?.state.inAppField = SharedSettings.defaults.bool(forKey: SharedSettings.inAppFieldKey)
             }
         }, SharedSettings.inAppField, nil, .deliverImmediately)
     }
 
     deinit {
         CFNotificationCenterRemoveEveryObserver(CFNotificationCenterGetDarwinNotifyCenter(),
-                                                Unmanaged.passUnretained(self).toOpaque())
+                                                Unmanaged.passUnretained(observer).toOpaque())
     }
 
     /// Opens the TsumuKey app. Extensions aren't given `UIApplication.open`,
@@ -190,16 +201,26 @@ final class KeyboardViewController: UIInputViewController {
         removeHost()
     }
 
+    private var lastReset = Date.distantPast
+
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
-        // iOS sends these often, even with plenty left. Only give up the
-        // model (reloaded on next open) when actually close to the limit.
+        // iOS sends these often, even with plenty left, and kills the keyboard
+        // near 76 MB (iPhone 15), falling back to the previous keyboard. Below
+        // 25 MB left, the model and the kana dictionary are dropped and loaded
+        // fresh, which also clears whatever they had built up. At most once a
+        // minute: warnings come in bursts.
         let available = Memory.availableMB()
-        if available < 15 {
-            state.predictor.unload()
-            if !state.textMode.isJapanese { KanaConverter.shared.unload() }
+        let reset = available < 25 && Date().timeIntervalSince(lastReset) > 60
+        TouchLog.log("memory warning: footprint=\(Memory.footprintMB())MB available=\(available)MB\(reset ? " reset" : "")")
+        guard reset else { return }
+        lastReset = Date()
+        state.predictor.unload()
+        KanaConverter.shared.unload()
+        state.loadEngines()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            TouchLog.log("memory reset done: footprint=\(Memory.footprintMB())MB available=\(Memory.availableMB())MB")
         }
-        TouchLog.log("memory warning: footprint=\(Memory.footprintMB())MB available=\(available)MB\(available < 15 ? " LM unloaded" : "")")
     }
 
     override func textDidChange(_ textInput: UITextInput?) {

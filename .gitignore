@@ -18,3 +18,6 @@ Models/*.gguf
 
 # Local tools, not part of the app.
 Tools/rank/
+
+# Sideloading IPAs (Tools/make_ipa.sh); attached to GitHub releases, not committed.
+dist/

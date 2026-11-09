@@ -58,7 +58,7 @@
   <div class="install">
     <a class="button" href="altstore://source?url=https://iito.github.io/TsumuKey/apps.json">Add to AltStore</a>
     <a class="button" href="sidestore://source?url=https://iito.github.io/TsumuKey/apps.json">Add to SideStore</a>
-    <a class="button secondary" href="https://github.com/Iito/TsumuKey/releases/latest">Download the IPA</a>
+    <a class="button secondary" id="ipa" href="https://github.com/Iito/TsumuKey/releases/download/v0.11.2/TsumuKey-0.11.2.ipa">Download the IPA</a>
   </div>
   <p class="note">AltStore and SideStore keep it up to date from this site's source
   (<a href="apps.json">apps.json</a>). The IPA also works with Sideloadly, Feather and similar tools, but only
@@ -78,5 +78,12 @@
   </table>
 </main>
 <footer>TsumuKey · <a href="privacy.html">Privacy policy</a></footer>
+<script>
+  // The IPA name carries the version, so take the newest downloadURL from the AltStore source.
+  fetch('apps.json').then(r => r.json()).then(j => {
+    const url = j.apps[0].versions[0].downloadURL;
+    if (url) document.getElementById('ipa').href = url;
+  }).catch(() => {});
+</script>
 </body>
 </html>

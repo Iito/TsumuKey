@@ -43,8 +43,9 @@ A kana flick pad and a romaji keyboard are there too, converted with azooKey.
 |---|---|
 | <img src="docs/media/menu.png" width="300"> | <img src="docs/media/longpress.png" width="300"> |
 
-QWERTY, Colemak, AZERTY, QWERTZ and Dvorak; keep up to three in the menu, the first
-is the default. Every key carries a symbol in its corner and long-press puts it
+Nine layouts: QWERTY, AZERTY, QWERTZ, Colemak, Dvorak, Bépo, Workman, Norman and
+Maltron. Keep up to three in the menu, the first is the default; hold one in the app
+to see its keys. Every key carries a symbol in its corner and long-press puts it
 under your finger, accents next to it.
 
 ### Also

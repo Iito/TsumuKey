@@ -23,6 +23,15 @@
       "screenshots": [],
       "versions": [
         {
+          "version": "0.11.3",
+          "buildVersion": "82",
+          "date": "2026-11-09",
+          "localizedDescription": "Fix for SideStore and AltStore installs: the keyboard now follows the app's settings (languages, colours) instead of its defaults.",
+          "downloadURL": "https://github.com/Iito/TsumuKey/releases/download/v0.11.3/TsumuKey-0.11.3.ipa",
+          "size": 29923555,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "0.11.2",
           "buildVersion": "74",
           "date": "2026-11-09",

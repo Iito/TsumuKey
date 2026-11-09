@@ -1,0 +1,44 @@
+{
+  "name": "TsumuKey",
+  "identifier": "io.github.iito.tsumukey",
+  "subtitle": "One keyboard, all your languages.",
+  "description": "An iOS keyboard for people who type in several languages at once. Pick any two of English, French, German and Spanish: suggestions and corrections mix them, with no switching. Japanese is always there: type romaji and tap the chip, or use the kana flick pad.\n\nPredictions and corrections run on your phone; the keyboard never goes online.\n\nAfter installing: Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey, then turn on Allow Full Access so the keyboard can read the app's settings and models.",
+  "iconURL": "https://iito.github.io/TsumuKey/media/icon.png",
+  "headerURL": "https://iito.github.io/TsumuKey/media/icon.png",
+  "website": "https://iito.github.io/TsumuKey/",
+  "tintColor": "C8102E",
+  "featuredApps": [
+    "com.tsumukey"
+  ],
+  "apps": [
+    {
+      "name": "TsumuKey",
+      "bundleIdentifier": "com.tsumukey",
+      "developerName": "TsumuKey",
+      "subtitle": "Multilingual keyboard with on-device prediction",
+      "localizedDescription": "An iOS keyboard for people who type in several languages at once. Pick any two of English, French, German and Spanish: suggestions and corrections mix them, with no switching. Japanese is always there: type romaji and tap the chip, or use the kana flick pad.\n\nPredictions and corrections run on your phone; the keyboard never goes online.\n\nAfter installing: Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey, then turn on Allow Full Access so the keyboard can read the app's settings and models.",
+      "iconURL": "https://iito.github.io/TsumuKey/media/icon.png",
+      "tintColor": "C8102E",
+      "category": "utilities",
+      "screenshots": [],
+      "versions": [
+        {
+          "version": "0.11.2",
+          "buildVersion": "74",
+          "date": "2026-11-09",
+          "localizedDescription": "Faster next-word suggestions; swapped letters corrected (wrold → world); French accents on one-letter words (a → à); Japanese keyboard can be turned off; nine layouts; maths and currency in the bar.",
+          "downloadURL": "https://github.com/Iito/TsumuKey/releases/download/v0.11.2/TsumuKey-0.11.2.ipa",
+          "size": 29921410,
+          "minOSVersion": "17.0"
+        }
+      ],
+      "appPermissions": {
+        "entitlements": [
+          "com.apple.security.application-groups"
+        ],
+        "privacy": {}
+      }
+    }
+  ],
+  "news": []
+}

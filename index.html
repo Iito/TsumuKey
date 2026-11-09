@@ -10,7 +10,7 @@
 <body>
 <header>
   <a class="brand" href="./">TsumuKey</a>
-  <nav><a href="./" aria-current="page">Home</a><a href="privacy.html">Privacy</a></nav>
+  <nav><a href="./" aria-current="page">Home</a><a href="#install">Install</a><a href="privacy.html">Privacy</a></nav>
 </header>
 <main>
   <h1>One keyboard, all your languages. <span class="kanji">紡</span></h1>
@@ -50,6 +50,21 @@
     <div class="card"><h3>Emoji search</h3><p>Search emoji in five languages, with your default skin tone.</p></div>
     <div class="card"><h3>On device</h3><p>The keyboard never goes online. Nothing you type leaves your phone. <a href="privacy.html">Privacy</a></p></div>
   </div>
+
+  <h2 id="install">Install</h2>
+  <p>TsumuKey isn't on the App Store. Install it with a sideloading app, which signs it with your own Apple ID:</p>
+  <div class="install">
+    <a class="button" href="altstore://source?url=https://iito.github.io/TsumuKey/apps.json">Add to AltStore</a>
+    <a class="button" href="sidestore://source?url=https://iito.github.io/TsumuKey/apps.json">Add to SideStore</a>
+    <a class="button secondary" href="https://github.com/Iito/TsumuKey/releases/latest">Download the IPA</a>
+  </div>
+  <p class="note">AltStore and SideStore keep it up to date from this site's source
+  (<a href="apps.json">apps.json</a>). The IPA also works with Sideloadly, Feather and similar tools, but only
+  AltStore and SideStore keep the keyboard connected to the app's settings and downloaded models; with the
+  others the keyboard uses its defaults. With a free Apple ID, sideloaded apps last 7 days unless your
+  sideloading app refreshes them.</p>
+  <p>Then on the iPhone: Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey, and turn on
+  <strong>Allow Full Access</strong> so the keyboard can read the app's settings. It still never goes online.</p>
 
   <h2>Typing accuracy against the iOS keyboard</h2>
   <p>The same simulated taps, typed back to back on the iOS keyboard (English &amp; French) and on TsumuKey

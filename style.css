@@ -46,6 +46,10 @@ figcaption { text-align: center; color: var(--muted); font-size: 0.9rem; margin-
 .bars div { display: grid; grid-template-columns: 9em 1fr; gap: 12px; align-items: center; }
 .bars img { width: 100%; max-width: 380px; border-radius: 6px; }
 .bars span { color: var(--muted); font-size: 0.9rem; }
+.install { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 16px; }
+.button { display: inline-block; padding: 10px 18px; border-radius: 12px; background: var(--accent); color: #fff;
+  text-decoration: none; font-weight: 600; }
+.button.secondary { background: var(--card); color: var(--fg); border: 1px solid var(--line); }
 table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 0.95rem; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 footer { color: var(--muted); font-size: 0.85rem; padding-top: 48px; padding-bottom: 32px; }

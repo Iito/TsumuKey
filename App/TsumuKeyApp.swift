@@ -121,6 +121,9 @@ struct ContentView: View {
                     let picked = codes.split(separator: ",").compactMap { PredictionLanguage(rawValue: String($0)) }
                     if !picked.isEmpty { settings.predictionLanguages = picked; settings.save() }
                 }
+                // UI tests: "-alphabet korean|japanese|none" picks the other alphabet.
+                if let name = UserDefaults.standard.string(forKey: "alphabet"),
+                   let a = AsianLanguage(rawValue: name) { settings.asianLanguage = a; settings.save() }
                 // UI tests: "-model gemma|dense|moe" picks the correction model.
                 if let name = UserDefaults.standard.string(forKey: "model"),
                    let m = CorrectionModel(rawValue: name) { settings.correctionModel = m; settings.save() }

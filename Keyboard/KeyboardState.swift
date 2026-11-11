@@ -100,14 +100,21 @@ final class KeyboardState: ObservableObject {
             predictor.unload()
             KanaConverter.shared.load()
         } else if textMode == .hangul {
-            // Korean: word completions only (no prediction model yet).
-            predictor.unload()
+            // Korean: touch-aware corrections from the Korean word list. The
+            // European model stays: Dubeolsik taps spell Latin words too, and
+            // the bar offers them (ㅗㄷㅣㅣㅐ → "hello").
             KanaConverter.shared.unload()
+            if usesCheonjiin { KoreanDecoder.shared.unload() } else { KoreanDecoder.shared.load() }
             DispatchQueue.global(qos: .userInitiated).async {
                 KoreanWords.shared.load()
                 DispatchQueue.main.async { [weak self] in self?.textChanged() }
             }
+            Suggester.languages = settings.predictionLanguages
+            predictor.setLanguages(settings.predictionLanguages)
+            predictor.setModel(settings.correctionModel)
+            predictor.load()
         } else {
+            KoreanDecoder.shared.unload()
             if !koreanInABC { KoreanWords.shared.unload() }
             if japaneseInABC { KanaConverter.shared.load() } else { KanaConverter.shared.unload() }
             if koreanInABC {
@@ -304,6 +311,9 @@ final class KeyboardState: ObservableObject {
     var keyMap = KeyMap()
     /// Taps that typed the current word, with where each finger landed.
     private var taps: [Tap] = []
+    /// Dubeolsik taps of the Hangul word being typed, one per jamo, named by
+    /// the QWERTY letter of the key (Korean and Latin decoders read them).
+    private var hangulTaps: [Tap] = []
     /// A word finished before its correction was ready; the fix is applied
     /// when it arrives, as long as the text still ends the same way.
     private struct LateFix {
@@ -415,6 +425,14 @@ final class KeyboardState: ObservableObject {
             insert(s)
             return
         }
+        if mode == .hangul && !usesCheonjiin {
+            let word = hangulWord
+            let fixed = koreanCorrection(word, taps: hangulTaps)
+            hangulTaps = []
+            insert(s)
+            if let fixed { lastCorrection = (word, fixed, s) }
+            return
+        }
         let word = currentWord
         let wordTaps = taps
         let fixed = applyCorrection(word)
@@ -451,6 +469,18 @@ final class KeyboardState: ObservableObject {
         for _ in 0..<word.count { proxy?.deleteBackward() }
         proxy?.insertText(fix)
         return (word, fix)
+    }
+
+    /// Fixes the Hangul word just finished, as the bar showed it (or works
+    /// it out now: a Korean decode takes a few milliseconds). Returns the fix.
+    private func koreanCorrection(_ word: String, taps: [Tap]) -> String? {
+        guard !word.isEmpty, autocorrectOn, !isKnown(word), KoreanDecoder.shared.isLoaded else { return nil }
+        let fix = correctionWord == word ? pendingCorrection
+            : KoreanDecoder.shared.decode(word, taps: taps, keys: keyMap, autocorrect: true, full: true)?.correction
+        guard let fix, fix != word else { return nil }
+        for _ in 0..<word.count { proxy?.deleteBackward() }
+        proxy?.insertText(fix)
+        return fix
     }
 
     /// Typing outran the bar: the model hasn't seen this word yet.
@@ -508,11 +538,13 @@ final class KeyboardState: ObservableObject {
         }
         if mode == .hangul, !usesCheonjiin, !hangul.isEmpty, textBefore.hasSuffix(hangulText),
            let edit = hangul.backspace() {
+            if !hangulTaps.isEmpty { hangulTaps.removeLast() }
             applyHangul([edit], text: hangul.text)
             return
         }
         hangul.reset()
         cheonjiin.reset()
+        hangulTaps = []
         if !taps.isEmpty { taps.removeLast() }
         if let late = lateFix {
             // Deleting into the finished word means it's being edited by hand.
@@ -686,8 +718,11 @@ final class KeyboardState: ObservableObject {
         if mode == .hangul {
             // A completion replaces the Hangul word being typed.
             let word = hangulWord
+            // The word as typed over a pending fix: keep it from now on.
+            if pendingCorrection != nil, suggestion == word { learn(word) }
             hangul.reset()
             cheonjiin.reset()
+            hangulTaps = []
             for _ in 0..<word.count { proxy?.deleteBackward() }
             insert(suggestion + " ")
             return
@@ -743,6 +778,8 @@ final class KeyboardState: ObservableObject {
         } else if mode == .hangul {
             switch key.action {
             case .text(let s) where s.count == 1 && HangulComposer.isJamo(s.first!):
+                if hangulWord.isEmpty { hangulTaps = [] }
+                if let letter = HangulComposer.qwerty[s.first!] { hangulTaps.append(Tap(letter: letter, point: point)) }
                 typeHangul(s.first!)
                 return
             case .backspace, .shift:
@@ -1027,9 +1064,7 @@ final class KeyboardState: ObservableObject {
             if pasteAvailable != canPaste { canPaste = pasteAvailable }
         }
         if mode == .hangul {
-            let completions = KoreanWords.shared.complete(hangulWord)
-            if completions != suggestions { suggestions = completions }
-            if pendingCorrection != nil { pendingCorrection = nil }
+            refreshHangulBar()
             return
         }
         guard mode == .letters else {
@@ -1057,6 +1092,38 @@ final class KeyboardState: ObservableObject {
         predictor.refresh(request) { [weak self] result in
             guard let self, result.word == self.currentWord else { return }
             if result.suggestions != self.suggestions { self.suggestions = result.suggestions }
+        }
+    }
+
+    /// Hangul bar: a pending fix ("typed", fix, one more), else completions
+    /// and fixes; plus the European word the same taps spell, when there is one.
+    private func refreshHangulBar() {
+        let word = hangulWord
+        var korean: [String]
+        var fix: String?
+        if KoreanDecoder.shared.isLoaded, !word.isEmpty {
+            let canFix = autocorrectOn && !isKnown(word)
+            fix = KoreanDecoder.shared.decode(word, taps: hangulTaps, keys: keyMap, autocorrect: canFix, full: true)?.correction
+            korean = KoreanDecoder.shared.decode(word, taps: hangulTaps, keys: keyMap, autocorrect: false, full: false)?
+                .suggestions.filter { $0 != fix } ?? []
+        } else {
+            korean = KoreanWords.shared.complete(word)
+        }
+        correctionWord = word
+        if fix != pendingCorrection { pendingCorrection = fix }
+        if korean != suggestions { suggestions = korean }
+        // The same taps as Latin letters, when they're the whole word.
+        let letters = String(hangulTaps.map(\.letter))
+        guard predictor.isReady, letters.count >= 2, HangulComposer.qwertyKey(word) == letters else { return }
+        let request = DecodeRequest(before: "", word: letters, taps: hangulTaps, keys: keyMap, autocorrect: true)
+        predictor.latinWord(request) { [weak self] latin in
+            guard let self, let latin, self.mode == .hangul, self.hangulWord == word else { return }
+            // Letters that spell the word exactly always show; a fixed Latin
+            // word only when Korean can't explain the taps (no word, no fix).
+            if latin != letters && (KoreanDecoder.shared.isWord(word) || self.pendingCorrection != nil) { return }
+            var list = korean.filter { $0 != latin }
+            if self.pendingCorrection != nil { list.insert(latin, at: 0) } else { list = Array(list.prefix(2)) + [latin] }
+            if list != self.suggestions { self.suggestions = list }
         }
     }
 

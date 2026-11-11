@@ -105,6 +105,19 @@ final class Predictor {
         queue.async { [self] in run(request, full: true, completion) }
     }
 
+    /// The European word the taps spell, for the Hangul keyboard's bar
+    /// (Dubeolsik keys are QWERTY keys: ㅗㄷㅣㅣㅐ is "hello"). The word as
+    /// tapped when it's a real one, else the decoder's fix; nil if neither.
+    func latinWord(_ request: DecodeRequest, completion: @escaping (String?) -> Void) {
+        let id = lock.withLock { latestRefresh += 1; return latestRefresh }
+        queue.async { [self] in
+            guard id == lock.withLock({ latestRefresh }), let decoder else { return }
+            let found = decoder.candidates(request)
+            let word = found?.typedIsWord == true ? request.word : decoder.decode(request, full: true).correction
+            DispatchQueue.main.async { completion(word) }
+        }
+    }
+
     private func run(_ request: DecodeRequest, full: Bool, _ completion: @escaping (DecodeResult) -> Void) {
         guard let decoder else { return }
         let result = decoder.decode(request, full: full)

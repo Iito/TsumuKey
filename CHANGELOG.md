@@ -5,6 +5,8 @@ The app shows its version at the bottom of its settings (from build 44; before, 
 
 Rules (from 0.6.0):
 - Build number: +1 for every build installed on a phone, with an entry here. Never reset.
+- Version: bumped only when work reaches main, once per merge, however many features it
+  packs (from 0.12.0). Builds on a branch carry the version that merge will get.
 - Version, major.minor.patch:
   - major: first public release (1.0.0), later a big change in how the app works;
   - minor: a new feature worth telling a user about (setting, screen, model type);
@@ -12,6 +14,25 @@ Rules (from 0.6.0):
 - Model updates shipped through Hugging Face don't change the app version; the small model
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
+
+## 0.12.0 (build 86), 2026-11-10
+Installed on the iPhone 16 Pro Max (benchmark).
+- Korean autocorrection now knows where each Hangul key sits, so it reads where the finger
+  landed (build 85 only knew which key was hit).
+
+## 0.12.0 (build 85), 2026-11-10
+Installed on the iPhone 16 Pro Max (benchmark).
+- Korean autocorrection on the Dubeolsik keyboard: taps are read like on the ABC keyboard
+  (where the finger landed, not just the key), against a 250,000-word Korean list filed
+  under each word's keys. Fixes on space or punctuation; backspace right after restores
+  what was typed and keeps it from then on. The bar shows the fix in bold, like ABC.
+- English (and the other European languages) on the Hangul keyboard: the keys under the
+  Latin letters spell words too (ㅗㄷㅣㅣㅐ = hello), and the bar offers the word; tap it to
+  swap.
+
+## 0.12.0 (build 83), 2026-11-09
+Installed on the iPhone 15.
+- The Korean work (builds 75-81) together with 0.11.3's fix for sideloaded installs.
 
 ## 0.11.3 (build 82), 2026-11-09
 Release build (GitHub release, sideloading). Builds 75-81 are the Korean work on its own branch.
@@ -271,7 +292,6 @@ Installed on the iPhone 15.
 ## 0.6.0 (build 46), 2026-11-07
 Installed on the iPhone 15. Same app as build 45; the version is written 0.6.0 under the
 rules above.
-
 
 ## 0.6 (build 45), 2026-11-07
 Installed on the iPhone 15 (build 44 had a "Replace which?" swap, dropped). New version for what changed since 0.5 (build 21):

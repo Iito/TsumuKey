@@ -153,6 +153,22 @@ extension HangulComposer {
         return out
     }
 
+    /// The Dubeolsik key each jamo sits on, named by its QWERTY letter.
+    /// Tense consonants and ㅒ ㅖ share their unshifted key.
+    static let qwerty: [Character: Character] = {
+        var map = Dictionary(uniqueKeysWithValues: zip("ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔㅁㄴㅇㄹㅎㅗㅓㅏㅣㅋㅌㅊㅍㅠㅜㅡ", "qwertyuiopasdfghjklzxcvbnm"))
+        for (tense, plain) in zip("ㅃㅉㄸㄲㅆㅒㅖ", "ㅂㅈㄷㄱㅅㅐㅔ") { map[tense] = map[plain] }
+        return map
+    }()
+
+    /// The keys a Hangul word is typed on, as QWERTY letters: 안녕 → "dkssud".
+    /// How the Korean word list files its words, so the touch-aware decoder
+    /// reads Korean taps like Latin ones. Nil for anything but Hangul.
+    static func qwertyKey(_ word: String) -> String? {
+        let keys = jamoKey(word).compactMap { qwerty[$0] }
+        return keys.isEmpty || keys.count != jamoKey(word).count ? nil : String(keys)
+    }
+
     /// Compound vowels and finals as their typed parts (ㅘ → ㅗㅏ, ㄺ → ㄹㄱ).
     private static func split(_ c: Character) -> String {
         if let pair = compoundVowels.first(where: { $0.value == c })?.key { return pair }

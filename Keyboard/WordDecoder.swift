@@ -57,6 +57,15 @@ final class WordDecoder {
     let lexicon: Lexicon
     /// French elisions ("menvoyer" → "m'envoyer") only when French is on.
     var french = true
+    /// How a word is filed in `lexicon`: plain a-z for the Latin list;
+    /// Korean files Hangul under the QWERTY keys of its jamo (안녕 → "dkssud").
+    var keyFor: (String) -> String? = Lexicon.key
+    /// Typed real words rarer than this are replaced more easily. Off (0)
+    /// for Korean, whose endings make most real words look rare.
+    var rareWordZipf = WordDecoder.rareZipf
+    /// Margin to replace a typed non-word. Higher for Korean, where a word
+    /// missing from the list is often a real one with an uncommon ending.
+    var typoMargin = WordDecoder.replaceTypoMargin
 
     /// Cost (in nats, like the model's scores) of a tap with no letter, or a
     /// letter with no tap.
@@ -116,7 +125,7 @@ final class WordDecoder {
                                 log: "PREDICT \(predictions) \(ms(started, Date()))ms")
         }
         let typed = r.word.lowercased()
-        guard let typedKey = Lexicon.key(typed) else {
+        guard let typedKey = keyFor(typed) else {
             return DecodeResult(word: r.word, correction: nil, suggestions: [], log: "DECODE \(r.word) skipped")
         }
         let gen = generate(r, typed: typed, typedKey: typedKey)
@@ -171,9 +180,9 @@ final class WordDecoder {
 
         var correction: String?
         if r.autocorrect, let best = fixes.max(by: { total[$0]! < total[$1]! }) {
-            let accentOnly = Lexicon.key(best) == typedKey
-            var margin = typedIsWord ? Self.replaceRealWordMargin : Self.replaceTypoMargin
-            if typedIsWord, enabledZipf(typed) < Self.rareZipf { margin = Self.replaceRareWordMargin }
+            let accentOnly = keyFor(best) == typedKey
+            var margin = typedIsWord ? Self.replaceRealWordMargin : typoMargin
+            if typedIsWord, enabledZipf(typed) < rareWordZipf { margin = Self.replaceRareWordMargin }
             // "a"/"à" is a coin flip the small model calls by only a nat or
             // so, and English context never favours "à": trust the lean.
             if accentOnly { margin = min(margin, typedKey.count == 1 ? 0.5 : Self.accentMargin) }
@@ -256,7 +265,7 @@ final class WordDecoder {
     /// model would get to judge, each with its fit to the taps.
     func candidates(_ r: DecodeRequest) -> (typed: String, typedIsWord: Bool, words: [(String, Float)])? {
         let typed = r.word.lowercased()
-        guard let typedKey = Lexicon.key(typed) else { return nil }
+        guard let typedKey = keyFor(typed) else { return nil }
         let g = generate(r, typed: typed, typedKey: typedKey)
         let close = g.keyOf.compactMap { w, k in g.spatial[k].flatMap { $0 > Self.worstSpatial ? (w, $0) : nil } }
         return (typed, g.typedIsWord, [(typed, g.spatial[typedKey]!)] + close)

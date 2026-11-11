@@ -38,12 +38,18 @@ struct TouchLayer: UIViewRepresentable {
     }
 
     /// Letter (and apostrophe) key centers, in the same space as the points
-    /// TouchView reports.
+    /// TouchView reports. Dubeolsik keys are filed under their QWERTY letter
+    /// (ㅂ is "q"), which is how the Korean decoder names taps.
     private static func keyMap(_ keys: [KeyGeometry]) -> KeyMap {
         var map = KeyMap()
         for geo in keys {
-            guard case .text(let s) = geo.key.action, s.count == 1,
-                  let letter = s.lowercased().first, letter.isASCII,
+            guard case .text(let s) = geo.key.action, s.count == 1, let c = s.first else { continue }
+            if let letter = HangulComposer.qwerty[c] {
+                map.centers[letter] = CGPoint(x: geo.local.midX, y: geo.local.midY)
+                map.keySize = geo.local.size
+                continue
+            }
+            guard let letter = s.lowercased().first, letter.isASCII,
                   letter.isLetter || letter == "'" else { continue }
             map.centers[letter] = CGPoint(x: geo.local.midX, y: geo.local.midY)
             map.keySize = geo.local.size

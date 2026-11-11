@@ -20,6 +20,8 @@ final class TypingBench: XCTestCase {
         let env = ProcessInfo.processInfo.environment
         if let m = env["BENCH_MODEL"] { app.launchArguments += ["-model", m] }
         if let l = env["BENCH_LAYOUT"] { app.launchArguments += ["-layout", l] }
+        // BENCH_ALPHABET korean|japanese|none picks the other alphabet.
+        if let a = env["BENCH_ALPHABET"] { app.launchArguments += ["-alphabet", a] }
         // BENCH_NUMBERROW 1|0 turns the number row on or off (it stays that way).
         if let n = env["BENCH_NUMBERROW"] { app.launchArguments += ["-numberRow", n] }
         app.launch()
@@ -66,10 +68,23 @@ final class TypingBench: XCTestCase {
         let start = Int(env["BENCH_START"] ?? "") ?? 0
         let gap = Double(env["BENCH_GAP"] ?? "") ?? 0.15
 
+        // BENCH_LANGKEY "x,y": tapped once before typing (⚙︎: to the Hangul
+        // keyboard) and once after (back to ABC).
+        let langKey = (env["BENCH_LANGKEY"] ?? "").split(separator: ",").compactMap { Double($0) }
+        var langKeyTapped = false
+        defer {
+            if langKeyTapped { at(CGFloat(langKey[0]), CGFloat(langKey[1])).tap(); sleep(1) }
+        }
+
         for (i, s) in sentences.enumerated() where i >= start && i < start + limit {
             app.buttons["clearField"].tap()
             field.tap()
             usleep(400_000)
+            if langKey.count == 2 && !langKeyTapped {
+                at(CGFloat(langKey[0]), CGFloat(langKey[1])).tap()
+                langKeyTapped = true
+                sleep(2)  // the Korean word list loads
+            }
             // One synthesized tap at a time on a fixed beat (BENCH_GAP, default
             // 0.15 s, ~70 wpm). A whole sentence in one event record played
             // back at the wrong pace and lost touches.

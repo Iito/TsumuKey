@@ -95,6 +95,13 @@ read the app's settings.
 
 Install Release builds: the decoder is about five times slower unoptimized.
 
+### Sideloading
+
+Each [release](https://github.com/Iito/TsumuKey/releases) has an unsigned IPA
+for AltStore, SideStore and the like, which re-sign it with your Apple ID.
+Releases marked pre-release (`-rc` tags) are test builds of the next version.
+They're built by `.github/workflows/ipa.yml` (`Tools/make_ipa.sh` locally).
+
 ### Models and word list
 
 The app ships the word list (`Models/lexicon-eu6.bin`) and the small

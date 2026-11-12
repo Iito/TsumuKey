@@ -2,7 +2,7 @@
   "name": "TsumuKey",
   "identifier": "io.github.iito.tsumukey",
   "subtitle": "One keyboard, all your languages.",
-  "description": "An iOS keyboard for people who type in several languages at once. Pick any two of English, French, German and Spanish: suggestions and corrections mix them, with no switching. Japanese is always there: type romaji and tap the chip, or use the kana flick pad.\n\nPredictions and corrections run on your phone; the keyboard never goes online.\n\nAfter installing: Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey, then turn on Allow Full Access so the keyboard can read the app's settings and models.",
+  "description": "An iOS keyboard for people who type in several languages at once. Pick any two of English, French, German, Spanish, Italian and Portuguese: suggestions and corrections mix them, with no switching. Turn on Detect Language to list them all; the keyboard follows the two you're typing. Japanese is always there: type romaji and tap the chip, or use the kana flick pad.\n\nPredictions and corrections run on your phone; the keyboard never goes online.\n\nAfter installing: Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey, then turn on Allow Full Access so the keyboard can read the app's settings and models.",
   "iconURL": "https://iito.github.io/TsumuKey/media/icon.png",
   "headerURL": "https://iito.github.io/TsumuKey/media/icon.png",
   "website": "https://iito.github.io/TsumuKey/",
@@ -16,12 +16,21 @@
       "bundleIdentifier": "com.tsumukey",
       "developerName": "TsumuKey",
       "subtitle": "Multilingual keyboard with on-device prediction",
-      "localizedDescription": "An iOS keyboard for people who type in several languages at once. Pick any two of English, French, German and Spanish: suggestions and corrections mix them, with no switching. Japanese is always there: type romaji and tap the chip, or use the kana flick pad.\n\nPredictions and corrections run on your phone; the keyboard never goes online.\n\nAfter installing: Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey, then turn on Allow Full Access so the keyboard can read the app's settings and models.",
+      "localizedDescription": "An iOS keyboard for people who type in several languages at once. Pick any two of English, French, German, Spanish, Italian and Portuguese: suggestions and corrections mix them, with no switching. Turn on Detect Language to list them all; the keyboard follows the two you're typing. Japanese is always there: type romaji and tap the chip, or use the kana flick pad.\n\nPredictions and corrections run on your phone; the keyboard never goes online.\n\nAfter installing: Settings → General → Keyboard → Keyboards → Add New Keyboard → TsumuKey, then turn on Allow Full Access so the keyboard can read the app's settings and models.",
       "iconURL": "https://iito.github.io/TsumuKey/media/icon.png",
       "tintColor": "C8102E",
       "category": "utilities",
       "screenshots": [],
       "versions": [
+        {
+          "version": "0.13.0",
+          "buildVersion": "101",
+          "date": "2026-11-12",
+          "localizedDescription": "Italian and Portuguese. Detect Language: list several languages and the keyboard follows the two you're typing. Korean keyboards (Dubeolsik and Cheonjiin) with touch-aware autocorrect. Long-press a suggestion for a grid of alternatives. Punctuation waits for a space before attaching. Emoji in the suggestion bar.",
+          "downloadURL": "https://github.com/Iito/TsumuKey/releases/download/v0.13.0/TsumuKey-0.13.0.ipa",
+          "size": 36794335,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.11.3",
           "buildVersion": "82",

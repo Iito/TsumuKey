@@ -19,8 +19,8 @@
   <p class="lead">TsumuKey is an iOS keyboard for people who type in several languages at once.
   <em>Tsumugi</em> (紡ぎ) is Japanese for weaving thread: TsumuKey weaves two languages<sup>*</sup>
   into one keyboard, with no switching.<br>Predictions and corrections run on your phone.</p>
-  <p class="note"><sup>*</sup> Any two of English, French, German and Spanish; more would bring prediction
-  and correction accuracy down. Japanese is always on, converted by azooKey, a separate open-source engine.</p>
+  <p class="note"><sup>*</sup> Any two of English, French, German, Spanish, Italian and Portuguese; with Detect Language
+  on, list them all and the keyboard follows the two you're typing. Japanese is always on, converted by azooKey, a separate open-source engine.</p>
 
   <figure>
     <img class="demo" src="media/demo.gif" alt="Typing hello wrold, autocorrected to Hello world; romaji converted to Japanese; numpad and symbols; Colemak, QWERTZ and Dvorak layouts">
@@ -28,7 +28,7 @@
   </figure>
 
   <h2>Two languages at once</h2>
-  <p>Pick any two of English, French, German and Spanish. The suggestion bar mixes them as you type;
+  <p>Pick any two of English, French, German, Spanish, Italian and Portuguese. The suggestion bar mixes them as you type;
   the ones you turned off stay out of the way.</p>
   <div class="bars">
     <div><span>Ich habe heute keine _</span><img src="media/bar-de-keine.png" alt="German suggestions"></div>
@@ -58,7 +58,7 @@
   <div class="install">
     <a class="button" href="altstore://source?url=https://iito.github.io/TsumuKey/apps.json">Add to AltStore</a>
     <a class="button" href="sidestore://source?url=https://iito.github.io/TsumuKey/apps.json">Add to SideStore</a>
-    <a class="button secondary" id="ipa" href="https://github.com/Iito/TsumuKey/releases/download/v0.11.2/TsumuKey-0.11.2.ipa">Download the IPA</a>
+    <a class="button secondary" id="ipa" href="https://github.com/Iito/TsumuKey/releases/download/v0.13.0/TsumuKey-0.13.0.ipa">Download the IPA</a>
   </div>
   <p class="note">AltStore and SideStore keep it up to date from this site's source
   (<a href="apps.json">apps.json</a>). The IPA also works with Sideloadly, Feather and similar tools, but only
@@ -79,11 +79,25 @@
 </main>
 <footer>TsumuKey · <a href="privacy.html">Privacy policy</a></footer>
 <script>
-  // The IPA name carries the version, so take the newest downloadURL from the AltStore source.
-  fetch('apps.json').then(r => r.json()).then(j => {
-    const url = j.apps[0].versions[0].downloadURL;
-    if (url) document.getElementById('ipa').href = url;
-  }).catch(() => {});
+  // The href above is the no-JS default. On load, ask GitHub for the releases
+  // (newest first) and point the button at the newest stable one that has an
+  // IPA: -rc pre-releases are skipped, and a release whose IPA is still
+  // building falls back to the previous one. A failed fetch (offline, API rate
+  // limit) leaves the default.
+  fetch('https://api.github.com/repos/Iito/TsumuKey/releases')
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    .then(releases => {
+      for (const rel of releases) {
+        if (rel.draft || rel.prerelease) continue;
+        const ipa = (rel.assets || []).find(a => a.name.toLowerCase().endsWith('.ipa') && a.state === 'uploaded');
+        if (!ipa) continue;
+        const btn = document.getElementById('ipa');
+        btn.href = ipa.browser_download_url;
+        btn.textContent = 'Download the IPA (' + rel.tag_name.replace(/^v/, '') + ')';
+        return;
+      }
+    })
+    .catch(() => {});
 </script>
 </body>
 </html>

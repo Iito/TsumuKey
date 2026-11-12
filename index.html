@@ -20,16 +20,17 @@
   <em>Tsumugi</em> (紡ぎ) is Japanese for weaving thread: TsumuKey weaves two languages<sup>*</sup>
   into one keyboard, with no switching.<br>Predictions and corrections run on your phone.</p>
   <p class="note"><sup>*</sup> Any two of English, French, German, Spanish, Italian and Portuguese; with Detect Language
-  on, list them all and the keyboard follows the two you're typing. Japanese is always on, converted by azooKey, a separate open-source engine.</p>
+  on, list them all and the keyboard follows the two you're typing. Add Japanese or Korean as the other alphabet; Japanese is converted by azooKey, a separate open-source engine.</p>
 
   <figure>
     <img class="demo" src="media/demo.gif" alt="Typing hello wrold, autocorrected to Hello world.; sushi offering 🍣 in the bar; Italian words switching the bar to Italian; a long press opening more suggestions; romaji converted to Japanese; Korean typed on Dubeolsik">
-    <figcaption>"hello wrold" becomes "Hello world.", romaji turns into 私は日本語を話す with one tap.</figcaption>
+    <figcaption>"hello wrold" becomes "Hello world.", "sushi" offers 🍣, Italian words switch the bar to Italian, a long press lists more words, romaji turns into 私は日本語を話す, and the same keys spell 안녕하세요 in Korean.</figcaption>
   </figure>
 
   <h2>Two languages at once</h2>
   <p>Pick any two of English, French, German, Spanish, Italian and Portuguese. The suggestion bar mixes them as you type;
-  the ones you turned off stay out of the way.</p>
+  the ones you turned off stay out of the way. With Detect Language on (the default), list as many as you like: the bar
+  follows the two you're typing.</p>
   <div class="bars">
     <div><span>Ich habe heute keine _</span><img src="media/bar-de-keine.png" alt="German suggestions"></div>
     <div><span>Quiero comer una manz_</span><img src="media/bar-es-manz.png" alt="Spanish suggestions"></div>
@@ -37,18 +38,27 @@
 
   <h2>Japanese in the Latin keyboard</h2>
   <p>Type romaji and a red chip offers the Japanese; tap it to swap. A kana flick pad and a romaji
-  keyboard are there too.</p>
+  keyboard are there too; ⌄ at the end of the bar opens more conversions.</p>
   <div class="bars">
     <div><span>watashi</span><img src="media/bar-watashi.png" alt="watashi converted to 私"></div>
     <div><span>nihongowohanasu</span><img src="media/bar-nihongowohanasu.png" alt="nihongowohanasu converted to 日本語を話す"></div>
   </div>
 
+  <h2>Korean</h2>
+  <p>Pick 한국어 as the other alphabet for a Hangul keyboard: 두벌식 (Dubeolsik) or the 12-key 천지인 (Cheonjiin).
+  The bar completes words and autocorrect reads where your finger landed. On the Latin keyboard, romanised Korean
+  (annyeong) offers the Hangul in the red chip.</p>
+  <div class="bars">
+    <div><span>안녕</span><img src="media/bar-ko-annyeong.png" alt="안녕 completed to 안녕하세요, 안녕히, 안녕하십니까"></div>
+  </div>
   <h2>Also</h2>
   <div class="grid">
     <div class="card"><h3>Tap-aware corrections</h3><p>Each word is scored on where your finger landed plus how likely it is in context.</p></div>
     <div class="card"><h3>Learns your words</h3><p>Undo a correction with backspace and that word is never corrected again.</p></div>
     <div class="card"><h3>Your layout</h3><p>QWERTY, AZERTY, QWERTZ, Colemak, Dvorak, Bépo, Workman, Norman and Maltron; keep up to three in the menu.</p></div>
     <div class="card"><h3>Symbols under your finger</h3><p>Every key carries a symbol; long-press puts it right above, accents next to it.</p></div>
+    <div class="card"><h3>More words on a long press</h3><p>Hold a word in the bar for a grid of the other words that fit, in place of the keys.</p></div>
+    <div class="card"><h3>Emoji in the bar</h3><p>A word that names an emoji ("pizza", "hund", "merci") offers it in the bar; a tap adds it after the word.</p></div>
     <div class="card"><h3>Emoji search</h3><p>Search emoji in five languages, with your default skin tone.</p></div>
     <div class="card"><h3>On device</h3><p>The keyboard never goes online. Nothing you type leaves your phone. <a href="privacy.html">Privacy</a></p></div>
   </div>
@@ -76,6 +86,8 @@
     <tr><td>Careful</td><td>92.1% words right</td><td><strong>95.0%</strong></td></tr>
     <tr><td>Fast</td><td>75.9%</td><td><strong>77.9%</strong></td></tr>
   </table>
+  <p>Korean on 두벌식, the same way against the iOS Korean keyboard: careful 85.6% → <strong>95.8%</strong>,
+  fast 49.2% → <strong>81.8%</strong>.</p>
 </main>
 <footer>TsumuKey · <a href="privacy.html">Privacy policy</a></footer>
 <script>

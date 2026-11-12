@@ -13,7 +13,7 @@ languages into one keyboard, with no switching. Everything runs on the phone.
 
 ### Two languages at once
 
-Pick any two of English, French, German and Spanish. The bar mixes them as you type;
+Pick any two of English, French, German, Spanish, Italian and Portuguese. The bar mixes them as you type;
 the ones you turned off stay out of the way.
 
 | Languages | You type | Bar |
@@ -97,7 +97,7 @@ Install Release builds: the decoder is about five times slower unoptimized.
 
 ### Models and word list
 
-The app ships the word list (`Models/lexicon-enfrdees.bin`) and the small
+The app ships the word list (`Models/lexicon-eu6.bin`) and the small
 correction model (`Models/ranker-*.rank`). Gemma 3 is downloaded from the
 app, from [Hugging Face](https://huggingface.co/iito-sama/tsumukey-models).
 
@@ -129,6 +129,7 @@ See `CHANGELOG.md` for what changed in each build.
 | [Gemma 3 270M](https://ai.google.dev/gemma) (downloaded) | [Gemma Terms of Use](https://ai.google.dev/gemma/terms) |
 | Word frequencies from [wordfreq](https://github.com/rspeer/wordfreq) (`Models/lexicon-*.bin`) | Apache 2.0 (code); data under CC BY-SA 4.0 |
 | Korean word counts from [FrequencyWords](https://github.com/hermitdave/FrequencyWords) (OpenSubtitles 2018; `Models/words-ko.txt`) | CC BY-SA 4.0 |
+| Language detector (`Models/langid.tkl`), built from [Tatoeba](https://tatoeba.org) sentences | CC BY 2.0 FR |
 
 ## Licence
 

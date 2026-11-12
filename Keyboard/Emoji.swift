@@ -40,8 +40,10 @@ enum EmojiData {
     struct Entry {
         let emoji: String
         let category: Category
-        /// " word word …": a leading space so " " + query matches word starts.
+        /// " word word … ": spaces around so " " + query matches word starts.
         let keywords: String
+        /// Short names, one per language ("dog", "chien", "hund"…), lowercase.
+        let names: [String]
         /// Five skin-tone versions, light to dark; empty when it has none.
         let tones: [String]
     }
@@ -51,8 +53,9 @@ enum EmojiData {
               let text = try? String(contentsOf: url, encoding: .utf8) else { return [] }
         return text.split(separator: "\n").compactMap { line in
             let f = line.split(separator: "\t", omittingEmptySubsequences: false)
-            guard f.count == 4, let c = Category(rawValue: String(f[0])) else { return nil }
-            return Entry(emoji: String(f[1]), category: c, keywords: " " + f[2],
+            guard f.count >= 4, let c = Category(rawValue: String(f[0])) else { return nil }
+            return Entry(emoji: String(f[1]), category: c, keywords: " " + f[2] + " ",
+                         names: f.count > 4 ? f[4].split(separator: "|").map(String.init) : [],
                          tones: f[3].split(separator: " ").map(String.init))
         }
     }()
@@ -80,12 +83,49 @@ enum EmojiData {
         guard !words.isEmpty else { return [] }
         var exact: [String] = [], prefix: [String] = []
         for e in entries where words.allSatisfy({ e.keywords.contains($0) }) {
-            if words.allSatisfy({ e.keywords.contains($0 + " ") || e.keywords.hasSuffix(String($0)) }) {
+            if words.allSatisfy({ e.keywords.contains($0 + " ") }) {
                 exact.append(e.emoji)
             } else {
                 prefix.append(e.emoji)
             }
         }
         return Array((exact + prefix).prefix(limit))
+    }
+
+    /// Words found in emoji names and keywords that say nothing about which
+    /// emoji ("smiling face with hearts", "visage avec", "gesicht mit").
+    private static let stopWords: Set<String> = [
+        "the", "and", "you", "for", "with", "not", "but", "are", "was", "this", "that", "from", "your", "our", "its",
+        "les", "des", "une", "que", "qui", "avec", "pour", "dans", "sur", "pas", "est", "mon", "ton", "son", "par",
+        "und", "mit", "der", "die", "das", "den", "dem", "ein", "eine", "ist", "für", "von", "auf", "nicht", "ich",
+        "los", "las", "una", "con", "por", "para", "del", "muy", "pero", "sin",
+    ]
+
+    /// The emoji the bar offers for a typed word: the one named after it
+    /// ("dog" → 🐕), else one whose name has it ("beer" → 🍺 beer mug), else
+    /// one that has it among its keywords, the earlier in the list the
+    /// better ("hello" → 👋). Nil for short and stop words.
+    static func suggestion(for word: String) -> String? {
+        let w = word.lowercased()
+        guard w.count >= 3 || w == "ok", !stopWords.contains(w), !w.contains(" ") else { return nil }
+        let needle = " \(w) "
+        var best: (rank: Double, emoji: String)?
+        var matches = 0
+        for e in entries where e.keywords.contains(needle) {
+            matches += 1
+            let rank: Double
+            if e.names.contains(w) {
+                rank = 0
+            } else if let name = e.names.first(where: { " \($0) ".contains(needle) }) {
+                rank = 1 + Double(name.split(separator: " ").count) / 100
+            } else {
+                let tokens = e.keywords.split(separator: " ")
+                rank = 2 + Double(tokens.firstIndex(of: Substring(w)) ?? tokens.count) / Double(tokens.count)
+            }
+            if rank < best?.rank ?? .infinity { best = (rank, e.emoji) }
+        }
+        // A keyword shared by dozens of emoji ("face", "food") picks none well.
+        guard let best, best.rank < 2 || matches <= 30 else { return nil }
+        return best.emoji
     }
 }

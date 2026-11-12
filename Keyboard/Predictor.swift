@@ -18,6 +18,7 @@ final class Predictor {
     private var latestRefresh = 0              // guarded by `lock`
     private let lock = NSLock()
     private var languages: [PredictionLanguage] = [.english, .french]  // queue only
+    private var lexiconLanguages: [PredictionLanguage] = [.english, .french]  // queue only
     private var model: CorrectionModel = .dense  // queue only
     /// Set on the main thread once the model is ready.
     private(set) var isReady = false
@@ -25,7 +26,7 @@ final class Predictor {
     func load() {
         queue.async { [self] in
             guard decoder == nil, !loadFailed else { return }
-            guard let words = Bundle.main.url(forResource: "lexicon-enfrdees", withExtension: "bin"),
+            guard let words = Bundle.main.url(forResource: "lexicon-eu6", withExtension: "bin"),
                   let lexicon = Lexicon(url: words),
                   let lm = makeScorer(lexicon) else {
                 loadFailed = true
@@ -67,16 +68,22 @@ final class Predictor {
         }
     }
 
-    func setLanguages(_ new: [PredictionLanguage]) {
+    /// `new`: what the model favours; `lexicon`: whose word lists autocorrect
+    /// searches (more than `new` with language detection on), default the same.
+    func setLanguages(_ new: [PredictionLanguage], lexicon: [PredictionLanguage]? = nil) {
+        let words = lexicon ?? new
         queue.async { [self] in
-            guard new != languages else { return }
+            guard new != languages || words != lexiconLanguages else { return }
             languages = new
+            lexiconLanguages = words
             apply()
         }
     }
 
     private func apply() {  // queue only
-        decoder?.lexicon.languages = languages.reduce(0) { $0 | $1.bit }
+        let list = lexiconLanguages
+        decoder?.lexicon.languages = list.reduce(0) { $0 | $1.bit }
+        decoder?.suggestionLanguages = languages.reduce(0) { $0 | $1.bit }
         decoder?.french = languages.contains(.french)
         (decoder?.lm as? Ranker)?.languages = languages
     }
@@ -115,6 +122,14 @@ final class Predictor {
             let found = decoder.candidates(request)
             let word = found?.typedIsWord == true ? request.word : decoder.decode(request, full: true).correction
             DispatchQueue.main.async { completion(word) }
+        }
+    }
+
+    /// The bar's long-press grid (see WordDecoder.choices).
+    func choices(_ request: DecodeRequest, completion: @escaping ([String]) -> Void) {
+        queue.async { [self] in
+            let words = decoder?.choices(request) ?? []
+            DispatchQueue.main.async { completion(words) }
         }
     }
 

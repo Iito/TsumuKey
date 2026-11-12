@@ -19,11 +19,22 @@ final class TypingBench: XCTestCase {
         // BENCH_MODEL gemma|dense|moe picks the correction model; BENCH_LAYOUT the letter layout.
         let env = ProcessInfo.processInfo.environment
         if let m = env["BENCH_MODEL"] { app.launchArguments += ["-model", m] }
-        if let l = env["BENCH_LAYOUT"] { app.launchArguments += ["-layout", l] }
-        // BENCH_ALPHABET korean|japanese|none picks the other alphabet.
-        if let a = env["BENCH_ALPHABET"] { app.launchArguments += ["-alphabet", a] }
+        // QWERTY unless told otherwise: the tap files are QWERTY, and a ⚙︎ tap
+        // with no other alphabet steps TsumuKey to the next layout (Colemak).
+        app.launchArguments += ["-layout", env["BENCH_LAYOUT"] ?? "qwerty"]
         // BENCH_NUMBERROW 1|0 turns the number row on or off (it stays that way).
         if let n = env["BENCH_NUMBERROW"] { app.launchArguments += ["-numberRow", n] }
+        // BENCH_LANGUAGES de,es picks the prediction languages (tap files taps-dees-*).
+        if let l = env["BENCH_LANGUAGES"] { app.launchArguments += ["-languages", l] }
+        // BENCH_ALPHABET korean|japanese|none picks the other alphabet.
+        if let a = env["BENCH_ALPHABET"] { app.launchArguments += ["-alphabet", a] }
+        // BENCH_JAPANESE kana|romaji picks the Japanese keyboard.
+        if let j = env["BENCH_JAPANESE"] { app.launchArguments += ["-japaneseInput", j] }
+        // BENCH_MODE letters|romaji|kana|hangul: the keyboard's starting mode
+        // (it remembers the last one; BENCH_LANGKEY's ⚙︎ tap only toggles).
+        if let m = env["BENCH_MODE"] { app.launchArguments += ["-textMode", m] }
+        // BENCH_AUTO 1|0: language detection on or off (it stays that way).
+        if let a = env["BENCH_AUTO"] { app.launchArguments += ["-autoLanguages", a] }
         app.launch()
         sleep(2)
     }
@@ -67,10 +78,16 @@ final class TypingBench: XCTestCase {
         let limit = Int(env["BENCH_LIMIT"] ?? "") ?? sentences.count
         let start = Int(env["BENCH_START"] ?? "") ?? 0
         let gap = Double(env["BENCH_GAP"] ?? "") ?? 0.15
-
         // BENCH_LANGKEY "x,y": tapped once before typing (⚙︎: to the Hangul
         // keyboard) and once after (back to ABC).
         let langKey = (env["BENCH_LANGKEY"] ?? "").split(separator: ",").compactMap { Double($0) }
+        // BENCH_RETURN "x,y": Japanese. After each phrase: space converts it
+        // (phrases marked "convert"), then return confirms it.
+        let returnKey = (env["BENCH_RETURN"] ?? "").split(separator: ",").compactMap { Double($0) }
+        // BENCH_ROWSHIFT "a,b,c": key units added to x on each letter row, for
+        // layouts whose rows sit differently (iOS Japanese romaji: a-l start at
+        // the left edge, ー at the end, so "0,-0.5,0").
+        let rowShift = (env["BENCH_ROWSHIFT"] ?? "0,0,0").split(separator: ",").compactMap { Double($0) }
         var langKeyTapped = false
         defer {
             if langKeyTapped { at(CGFloat(langKey[0]), CGFloat(langKey[1])).tap(); sleep(1) }
@@ -111,7 +128,23 @@ final class TypingBench: XCTestCase {
                     // TsumuKey its number row, so a stray tap there isn't a
                     // like-for-like slip.
                     let y = min(max(t[2] as! Double, 0.05), 2.95)
-                    try tap(left + CGFloat(t[1] as! Double) * unit, row0Y + CGFloat(y) * pitch)
+                    let x = (t[1] as! Double) + (rowShift.count == 3 ? rowShift[Int(y)] : 0)
+                    try tap(left + CGFloat(x) * unit, row0Y + CGFloat(y) * pitch)
+                }
+                if returnKey.count == 2 {
+                    if batch {
+                        try FastTaps.tapPoints(points, atTimes: times, hold: 0.05)
+                        points = []; times = []
+                    }
+                    usleep(400_000)  // candidates arrive
+                    // Same coordinates as the letter taps (BENCH_GEOM space).
+                    if w["convert"] as? Bool ?? true {
+                        try FastTaps.tapPoints([NSValue(cgPoint: CGPoint(x: spaceX, y: spaceY))], atTimes: [0], hold: 0.05)
+                        usleep(300_000)
+                    }
+                    try FastTaps.tapPoints([NSValue(cgPoint: CGPoint(x: returnKey[0], y: returnKey[1]))], atTimes: [0], hold: 0.05)
+                    usleep(300_000)
+                    continue
                 }
                 try tap(spaceX, spaceY)
                 if batch {
@@ -120,6 +153,13 @@ final class TypingBench: XCTestCase {
                 }
             }
             usleep(600_000) // corrections land on space, sometimes a beat later
+            // BENCH_SHOT=1: a screenshot after each sentence (debugging the run).
+            if env["BENCH_SHOT"] == "1" {
+                let shot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+                shot.name = "sentence-\(i)"
+                shot.lifetime = .keepAlways
+                add(shot)
+            }
             print("BENCHOUT|\(i)|\(text)")
         }
     }

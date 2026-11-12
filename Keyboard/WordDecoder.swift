@@ -66,6 +66,10 @@ final class WordDecoder {
     /// Margin to replace a typed non-word. Higher for Korean, where a word
     /// missing from the list is often a real one with an uncommon ending.
     var typoMargin = WordDecoder.replaceTypoMargin
+    /// Languages suggestions (completions, next words) come from: the
+    /// model's, which can be fewer than the lexicon's (language detection
+    /// lets corrections search them all). Nil: the lexicon's.
+    var suggestionLanguages: UInt8?
 
     /// Cost (in nats, like the model's scores) of a tap with no letter, or a
     /// letter with no tap.
@@ -116,11 +120,11 @@ final class WordDecoder {
         let tContext = Date()
 
         guard !r.word.isEmpty else {
-            // The model knows all four languages; keep its guesses to the
+            // The model knows every language; keep its guesses to the
             // enabled ones (a word with no key, like "2024", always passes).
             let predictions = ((leadingSpace || context.isEmpty)
                 ? lm.predict(count: 3, leadingSpace: leadingSpace && !context.isEmpty) : [])
-                .filter { Lexicon.key($0).map(lexicon.contains) ?? true }
+                .filter { Lexicon.key($0).map { lexicon.contains($0, languages: suggestionLanguages) } ?? true }
             return DecodeResult(word: "", correction: nil, suggestions: predictions,
                                 log: "PREDICT \(predictions) \(ms(started, Date()))ms")
         }
@@ -153,7 +157,7 @@ final class WordDecoder {
             // A completion one letter longer ("pomm" → "pomme") is also a
             // single-insertion fix, where it would pay the missed-tap cost and
             // drop below rarer, longer words. Score it as a completion.
-            let longer = lexicon.completions(typedKey, limit: 12).map(\.word).filter { $0 != typed }
+            let longer = lexicon.completions(typedKey, limit: 12, languages: suggestionLanguages).map(\.word).filter { $0 != typed }
             let completing = Set(longer)
             let typedSpatial = spatialOf(typedKey)
             let quickLonger = lm.quickScore(longer.map { display($0, like: r.word) }, leadingSpace: leadingSpace)
@@ -224,6 +228,54 @@ final class WordDecoder {
         var keyOf: [String: String]
         /// Key -> how well it fits the taps (nats), for every candidate key and the typed one.
         var spatial: [String: Float]
+    }
+
+    /// Words scoring within this many nats of the best stay in the long-press
+    /// grid (5: about 1/150 as likely).
+    static let choiceWindow: Float = 5
+
+    /// The bar's long-press grid: candidates for the word being typed (or
+    /// the next word), scored in full and kept while close to the best one,
+    /// best first. Runs only on a long press: scoring ~30 words costs ~0.1 s.
+    func choices(_ r: DecodeRequest, limit: Int = 30) -> [String] {
+        let (context, leadingSpace) = Self.split(r.before)
+        lm.setContext(context)
+        var scored: [(word: String, total: Float)]
+        if r.word.isEmpty {
+            guard leadingSpace || context.isEmpty else { return [] }
+            let space = leadingSpace && !context.isEmpty
+            let words = lm.predict(count: 12, leadingSpace: space)
+                .filter { Lexicon.key($0).map { lexicon.contains($0, languages: suggestionLanguages) } ?? true }
+            scored = Array(zip(words, lm.score(words, leadingSpace: space)))
+        } else {
+            let typed = r.word.lowercased()
+            guard let typedKey = keyFor(typed) else { return [] }
+            let gen = generate(r, typed: typed, typedKey: typedKey)
+            lm.setTyped(typed, isWord: gen.typedIsWord)
+            var cache = gen.spatial
+            func spatial(_ k: String) -> Float {
+                if let v = cache[k] { return v }
+                let v = Self.spatial(k, taps: gen.taps, keys: r.keys)
+                cache[k] = v
+                return v
+            }
+            let close = gen.keyOf.filter { spatial($0.value) > Self.worstSpatial }.map(\.key)
+            let quick = lm.quickScore(close.map { display($0, like: r.word) }, leadingSpace: leadingSpace)
+            let fixes = zip(close, quick).map { ($0, spatial(gen.keyOf[$0]!) + $1) }
+                .sorted { $0.1 > $1.1 }.prefix(20).map(\.0)
+            let longer = lexicon.completions(typedKey, limit: 12, languages: suggestionLanguages).map(\.word)
+            var seen = Set<String>()
+            let all = ([typed] + fixes + longer).filter { seen.insert($0).inserted }
+            let lmScores = lm.score(all.map { display($0, like: r.word) }, leadingSpace: leadingSpace)
+            // Completions match the taps exactly as far as they go.
+            let typedSpatial = spatial(typedKey)
+            scored = all.enumerated().map { i, w in
+                (display(w, like: r.word), (gen.keyOf[w].map(spatial) ?? typedSpatial) + lmScores[i])
+            }
+        }
+        guard let best = scored.map(\.total).max() else { return [] }
+        return scored.filter { $0.total > best - Self.choiceWindow }
+            .sorted { $0.total > $1.total }.prefix(limit).map(\.word)
     }
 
     private func generate(_ r: DecodeRequest, typed: String, typedKey: String) -> Generated {

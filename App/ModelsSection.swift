@@ -151,13 +151,18 @@ struct ModelsSection: View {
             NavigationLink {
                 OrderedListPage(title: "Prediction Languages",
                                 items: $settings.predictionLanguages, all: PredictionLanguage.allCases,
-                                name: \.name, limit: KeyboardSettings.maxPredictionLanguages,
+                                name: \.name,
+                                limit: settings.autoLanguages ? PredictionLanguage.allCases.count : KeyboardSettings.maxPredictionLanguages,
                                 firstNote: nil, topAction: "Move to Top",
-                                info: ["Up to \(KeyboardSettings.maxPredictionLanguages). Suggestions and autocorrect mix them; more would make autocorrect swap right words for look-alikes in another language."])
+                                info: [settings.autoLanguages
+                                       ? "Detect Language is on: autocorrect knows the words of every language listed, and the two your recent words are in lead. The top two are where it starts."
+                                       : "Up to \(KeyboardSettings.maxPredictionLanguages). Suggestions and autocorrect mix them; more would make autocorrect swap right words for look-alikes in another language."])
             } label: {
                 LabeledContent("Prediction Languages",
-                               value: settings.predictionLanguages.map(\.name).joined(separator: ", "))
+                               value: (settings.autoLanguages ? settings.predictionLanguages : settings.manualLanguages)
+                                   .map(\.name).joined(separator: ", "))
             }
+            Toggle("Detect Language", isOn: $settings.autoLanguages)
             Picker("Model", selection: $settings.correctionModel) {
                 Text(smallLabel).tag(CorrectionModel.dense)
                 Text(gemmaInstalled ? "Gemma 3 (\(ModelStore.gemmaLabel))" : "Gemma 3 (not downloaded)").tag(CorrectionModel.gemma)

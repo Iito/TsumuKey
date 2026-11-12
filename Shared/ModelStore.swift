@@ -79,16 +79,18 @@ enum ModelStore {
 
     static func rankerInfo(_ url: URL) -> RankerInfo? {
         guard let h = try? FileHandle(forReadingFrom: url),
-              let data = try? h.read(upToCount: 48), data.count == 48, data.prefix(4) == Data("TKR3".utf8)
+              let data = try? h.read(upToCount: 52), data.count == 52,
+              ["TKR3", "TKR4"].contains(String(decoding: data.prefix(4), as: UTF8.self))
         else { return nil }
         try? h.close()
-        let v = (0..<11).map { i in Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4 + i * 4, as: UInt32.self) }) }
+        let v = (0..<12).map { i in Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: 4 + i * 4, as: UInt32.self) }) }
         let (buckets, d, layers, hidden, experts, ctx) = (v[0], v[1], v[2], v[3], v[4], v[5])
         let shared = v[8] == 1, eh = v[9], nf = v[10]
+        let langs = data[data.startIndex + 3] == UInt8(ascii: "4") ? v[11] : 4
         // Same tensors as Ranker.swift reads, in file order.
         let perLayer = 2 * d + (3 * d * d + 3 * d) + (d * d + d) + 2 * d + (2 * d * d + 2 * d) + (2 * d * d + d)
         let nin = 3 * d + nf, n = max(experts, 1)
-        var params = buckets * d + ctx * d + (4 * d + d) + layers * perLayer + 2 * d + (d * d + d)
+        var params = buckets * d + ctx * d + (langs * d + d) + layers * perLayer + 2 * d + (d * d + d)
         params += n * (nin * eh + eh + eh + 1)
         if experts > 0 { params += experts * d + experts }
         if shared { params += nin * hidden + hidden + hidden + 1 }
@@ -96,7 +98,7 @@ enum ModelStore {
     }
 
     /// Version of Models/ranker-dense.rank (update with the file).
-    static let bundledRankerRound = 10
+    static let bundledRankerRound = 11
 
     /// Gemma is download-only (not bundled: it would add 100 MB to the app).
     static let gemmaFile = "gemma-3-270m-enfrdees64k-Q4_0.gguf"

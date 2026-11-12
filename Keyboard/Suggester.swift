@@ -14,7 +14,7 @@ enum Suggester {
 
     private static func checkerCodes(for languages: [PredictionLanguage]) -> [String] {
         let available = UITextChecker.availableLanguages
-        let preferred: [PredictionLanguage: String] = [.english: "en_US", .french: "fr_FR", .german: "de_DE", .spanish: "es_ES"]
+        let preferred: [PredictionLanguage: String] = [.english: "en_US", .french: "fr_FR", .german: "de_DE", .spanish: "es_ES", .italian: "it_IT", .portuguese: "pt_PT"]
         // Exact codes vary by device ("en_US" vs "en"), so match by prefix.
         return languages.compactMap { l in
             available.first { $0 == preferred[l] } ?? available.first { $0.hasPrefix(l.rawValue) }

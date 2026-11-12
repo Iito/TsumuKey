@@ -15,6 +15,113 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.12.0 (build 101), 2026-11-12
+Installed on the iPhone 15.
+- Italian and Portuguese: new prediction languages, with a 6-language word list
+  (Models/lexicon-eu6.bin, format BKW3) and the small model v11 (training round 11, same
+  architecture as v10, trained with Italian and Portuguese added). Offline tap bench:
+  Italian/Portuguese 93.9% careful, 84.9% fast (v10: 69.1%, 46.8%); English, French, German
+  and Spanish unchanged within noise (95.5% / 87.1%, v10 95.7% / 87.3%).
+- With Detect Language on, Prediction Languages takes up to all six.
+- The MoE model is still the older 4-language one: it ignores Italian and Portuguese.
+
+## 0.12.0 (build 100), 2026-11-11
+Installed on the iPhone 15.
+- Fix: with more than two prediction languages and Detect Language on, word suggestions were
+  nonsense ("menos", "seiner", "grossen" after "I would like to go to the"). They drew from
+  every listed language's words while the model only rates the two it's using. Suggestions
+  (next word and completions) now come from those two; corrections still search all of them.
+
+## 0.12.0 (build 99), 2026-11-11
+Installed on the iPhone 15.
+- With Detect Language on, Prediction Languages takes up to all four: autocorrect knows the
+  words of every language listed, and detection picks the two that lead from among them (the
+  top two are where it starts). Off, the first two are used, as before.
+
+## 0.12.0 (build 98), 2026-11-11
+Installed on the iPhone 15.
+- Detect Language follows your recent words across sentences and text fields: each finished
+  word adds to a running score per language that fades over ~12 words (only those scores are
+  kept, never the words). Build 97 looked at the last 5 words of the field, so one ambiguous
+  word could swap in a third language (French words in DE+EN typing; phone bench DE+EN fast
+  79.0 vs 82.8 manual). Offline, starting from the wrong pair (EN+FR): DE+EN 97.5/88.2 (same
+  as manual), ES+EN 95.6/84.3 (manual 94.8/83.8).
+- UI tests: "-textMode" sets the keyboard's starting mode (it remembers the last one).
+
+## 0.12.0 (build 97), 2026-11-11
+Installed on the iPhone 15.
+- Detect Language (Languages & Model, on by default): autocorrect searches all four word lists
+  (EN, FR, DE, ES), and the model favours the two languages the last five words read as
+  (Models/langid.tkl, 3.4 MB memory-mapped, a few µs per word). Needs two words to switch;
+  until then the last detected languages stay, from field to field. The space bar shows them.
+  The chosen prediction languages are only where it starts. Offline replay of the DE+EN and
+  ES+EN benches: same as the matching manual setting (careful 97.5/95.2, fast 86.6/84.7).
+- Japanese setting "Unconverted text": Plain (default) types the kana as ordinary text and
+  edits it in place; Underlined is the iOS-style marked text. Underlined text breaks clearing
+  in SwiftUI text fields (Send, Clear leave the old text on screen); plain doesn't.
+
+## 0.12.0 (build 96), 2026-11-11
+Installed on the iPhone 15.
+- Faster next-word suggestions with the small model: the 2,000 candidate words are scored as
+  matrix products (Accelerate) instead of word by word. Same suggestions (identical top 10),
+  about 0.2 ms per keystroke on the iPhone 16 Pro Max instead of 3-10 ms.
+
+## 0.12.0 (build 95), 2026-11-11
+Installed on the iPhone 15.
+- The long-press grid lists only likely words, not a fixed number: candidates are scored in
+  full when the grid opens and kept while within 5 nats of the best (about 1/150 as likely),
+  up to 30. The bar's own words always stay in it. Scoring runs only on the long press
+  (~0.1 s), so typing costs nothing more (build 94 asked the model for 16 next words on every
+  space).
+- ⌄ in the bar is back to Japanese conversions only.
+
+## 0.12.0 (build 94), 2026-11-11
+Installed on the iPhone 15.
+- Long press on any word in the bar opens a grid of alternatives in place of the keys: every
+  candidate for the word being typed (or the next word), the pressed one first, up to 30. The
+  red Japanese word opens its conversions (or the drop-down, per "More conversions"). ⌄ at
+  the end of the bar opens it too when there's more than the bar shows; ⌃, a pick or any edit
+  closes it.
+
+## 0.12.0 (build 93), 2026-11-11
+Installed on the iPhone 15.
+- Japanese in the ABC keyboard: ⌄ at the end of the bar opens the red word's conversions
+  (up to 30) in a grid in place of the keys, like the iOS kana keyboard; ⌃ closes it. A long
+  press on the word does the same. Setting "More conversions": Grid (default) or Drop-down
+  (build 92's list under the word, top 10).
+
+## 0.12.0 (build 92), 2026-11-11
+Installed on the iPhone 15.
+- The long-press list of Japanese conversions drops down from the red word, over the keys,
+  instead of replacing the bar. Tap outside it to close it.
+
+## 0.12.0 (build 91), 2026-11-11
+Installed on the iPhone 15.
+- Japanese in the ABC keyboard: a long press on the red Japanese word in the bar lists its
+  top 10 conversions; tap one to type it. Typing on hides the list.
+
+## 0.12.0 (build 90), 2026-11-11
+Installed on the iPhone 15.
+- Punctuation after a space ("word .") now waits for your next space or return before
+  moving against the word ("word. "). A run of marks stays as typed, so "word ..." keeps
+  its space.
+
+## 0.12.0 (build 89), 2026-11-10
+Installed on the iPhone 16 Pro Max (benchmark).
+- Romaji keyboard: when the keys spell a word of your European languages that isn't natural
+  Japanese ("meeting", "file", "email"), that word is the first candidate, as typed. Short
+  words that read as Japanese stay Japanese ("made" まで, "kite" きて).
+
+## 0.12.0 (build 88), 2026-11-10
+Installed on the iPhone 16 Pro Max (benchmark).
+- Fix: Japanese text confirmed in the kana and romaji keyboards is now typed like any other
+  text. It used to be committed by unmarking the underlined text, which some apps (SwiftUI
+  text fields) never noticed: the app's own copy of the text stayed empty.
+
+## 0.12.0 (build 87), 2026-11-10
+Installed on the iPhone 16 Pro Max (benchmark).
+- Test-only: the app takes "-japaneseInput kana|romaji" at launch (Japanese benchmark).
+
 ## 0.12.0 (build 86), 2026-11-10
 Installed on the iPhone 16 Pro Max (benchmark).
 - Korean autocorrection now knows where each Hangul key sits, so it reads where the finger
@@ -29,6 +136,14 @@ Installed on the iPhone 16 Pro Max (benchmark).
 - English (and the other European languages) on the Hangul keyboard: the keys under the
   Latin letters spell words too (ㅗㄷㅣㅣㅐ = hello), and the bar offers the word; tap it to
   swap.
+
+## 0.12.0 (build 84), 2026-11-10
+Installed on the iPhone 15.
+- Emoji in the suggestion bar: a word that names one ("pizza", "dog", "merci", "hund") offers
+  it in the last slot while you type it and just after; a tap adds it after the word
+  ("pizza 🍕 "), in the chosen skin tone. On by default; Suggestion Bar → Emoji turns it off.
+- The emoji list's keywords come from a newer Unicode CLDR release (more everyday words,
+  such as "hello" and "bye" for 👋).
 
 ## 0.12.0 (build 83), 2026-11-09
 Installed on the iPhone 15.
@@ -292,6 +407,7 @@ Installed on the iPhone 15.
 ## 0.6.0 (build 46), 2026-11-07
 Installed on the iPhone 15. Same app as build 45; the version is written 0.6.0 under the
 rules above.
+
 
 ## 0.6 (build 45), 2026-11-07
 Installed on the iPhone 15 (build 44 had a "Replace which?" swap, dropped). New version for what changed since 0.5 (build 21):

@@ -1,3 +1,4 @@
+import Accelerate
 import Foundation
 
 /// Small candidate ranker that replaces Gemma for
@@ -12,14 +13,13 @@ final class Ranker: WordScorer {
     /// Multiplies every score (tuning knob for the bench).
     var weight: Float = 1
     var languages: [PredictionLanguage] = [.english, .french] {
-        didSet { lastContext = nil; if languages != oldValue { predictionConstants.removeAll() } }
+        didSet { lastContext = nil }
     }
-    var lexicon: Lexicon? { didSet { predictionCache.removeAll(); predictionConstants.removeAll(); shortlistMask = nil } }
-    private var predictionCache: [String: (projection: [Float], zipfs: [Float])] = [:]
-    private var predictionConstants: [String: [Float]] = [:]
-    private var predictionContext: [Float]?
+    var lexicon: Lexicon? { didSet { shortlistMask = nil } }
 
     private let buckets, dim, layers, hidden, experts, ctxLen, maxNG, expertHidden, nFeat: Int
+    /// Languages the model knows (PredictionLanguage order): 4 in TKR3, stored in TKR4.
+    private let nLang: Int
     private let hasShared: Bool
     private let embScale: [Float]
     private let emb: [Int8]
@@ -39,7 +39,8 @@ final class Ranker: WordScorer {
     private var expert = 0
 
     init?(url: URL) {
-        guard let data = try? Data(contentsOf: url), data.count > 36, data.prefix(4) == Data("TKR3".utf8) else { return nil }
+        guard let data = try? Data(contentsOf: url), data.count > 48,
+              ["TKR3", "TKR4"].contains(String(decoding: data.prefix(4), as: UTF8.self)) else { return nil }
         var o = 4
         func u32() -> Int { defer { o += 4 }; return Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: o, as: UInt32.self) }) }
         buckets = u32(); dim = u32(); layers = u32(); hidden = u32(); experts = u32(); ctxLen = u32(); maxNG = u32()
@@ -47,6 +48,7 @@ final class Ranker: WordScorer {
         hasShared = u32() == 1
         expertHidden = u32()
         nFeat = u32()
+        nLang = data[data.startIndex + 3] == UInt8(ascii: "4") ? u32() : 4
         func f16(_ n: Int) -> [Float] {
             defer { o += n * 2 }
             return data.withUnsafeBytes { raw in (0..<n).map { Float(raw.loadUnaligned(fromByteOffset: o + $0 * 2, as: Float16.self)) } }
@@ -69,7 +71,7 @@ final class Ranker: WordScorer {
             o += n / 4 * 3
         }
         let d = dim
-        pos = f16(ctxLen * d); langW = f16(d * 4); langB = f16(d)
+        pos = f16(ctxLen * d); langW = f16(d * nLang); langB = f16(d)
         var bs: [Block] = []
         for _ in 0..<layers {
             bs.append(Block(n1w: f16(d), n1b: f16(d), qkvW: f16(3 * d * d), qkvB: f16(3 * d), oW: f16(d * d), oB: f16(d),
@@ -95,7 +97,6 @@ final class Ranker: WordScorer {
     func setContext(_ text: String) -> Bool {
         guard text != lastContext else { return true }
         lastContext = text
-        predictionContext = nil
         let toks = Array((["<s>"] + Self.tokens(text)).suffix(ctxLen))
         let d = dim, pad = ctxLen - toks.count
         // x[t]: word vector + position; padding rows stay masked.
@@ -110,7 +111,7 @@ final class Ranker: WordScorer {
         let bits = langBits()
         for j in 0..<d {
             var s = langB[j]
-            for l in 0..<4 { s += langW[j * 4 + l] * bits[l] }
+            for l in 0..<nLang { s += langW[j * nLang + l] * bits[l] }
             out[j] += s
         }
         h = out
@@ -130,71 +131,23 @@ final class Ranker: WordScorer {
         let bits = langBits()
         return words.map { word in
             let w = word.lowercased().replacingOccurrences(of: "’", with: "'")
-            let c: [Float]
-            let z: [Float]
-            if predicting, let cached = predictionCache[w] {
-                c = cached.projection; z = cached.zipfs
-            } else {
-                let v = wordVector(w)
-                var projection = cprojB
-                for i in 0..<d {
-                    var sum: Float = 0
-                    for j in 0..<d { sum += cprojW[i * d + j] * v[j] }
-                    projection[i] += sum
-                }
-                c = projection
-                z = lexicon?.zipfs(of: w) ?? [0, 0, 0, 0]
-                if predicting { predictionCache[w] = (c, z) }
+            let v = wordVector(w)
+            var c = cprojB
+            for i in 0..<d {
+                var sum: Float = 0
+                for j in 0..<d { sum += cprojW[i * d + j] * v[j] }
+                c[i] += sum
             }
+            let z = zipfs(w)
             var feats = [Float](repeating: 0, count: nFeat)
             var zmax: Float = 0
-            for l in 0..<4 { feats[l] = z[l] * bits[l] / 8; zmax = max(zmax, z[l] * bits[l]) }
-            feats[4] = zmax / 8; feats[5] = zmax == 0 ? 1 : 0
-            if nFeat >= 8, let t = typed, w == t.word {
-                feats[6] = 1; feats[7] = t.isWord ? 1 : 0
+            for l in 0..<nLang { feats[l] = z[l] * bits[l] / 8; zmax = max(zmax, z[l] * bits[l]) }
+            let L = nLang
+            feats[L] = zmax / 8; feats[L + 1] = zmax == 0 ? 1 : 0
+            if nFeat >= L + 4, let t = typed, w == t.word {
+                feats[L + 2] = 1; feats[L + 3] = t.isWord ? 1 : 0
             }
-            if nFeat == 9 { feats[8] = predicting ? 1 : 0 }  // task flag: suggesting, not correcting
-            if predicting && experts == 0 && !hasShared {
-                let base: [Float]
-                if let existing = predictionConstants[w] {
-                    base = existing
-                } else {
-                    var constant = b1
-                    for i in 0..<d where c[i] != 0 {
-                        let row = (d + i) * expertHidden
-                        for k in 0..<expertHidden { constant[k] += c[i] * w1[row + k] }
-                    }
-                    for i in 0..<nFeat where feats[i] != 0 {
-                        let row = (3 * d + i) * expertHidden
-                        for k in 0..<expertHidden { constant[k] += feats[i] * w1[row + k] }
-                    }
-                    base = constant
-                    predictionConstants[w] = constant
-                }
-                let ctx: [Float]
-                if let existing = predictionContext {
-                    ctx = existing
-                } else {
-                    var value = [Float](repeating: 0, count: expertHidden)
-                    for i in 0..<d where h[i] != 0 {
-                        let row = i * expertHidden
-                        for k in 0..<expertHidden { value[k] += h[i] * w1[row + k] }
-                    }
-                    ctx = value
-                    predictionContext = value
-                }
-                var a = base
-                for k in 0..<expertHidden { a[k] += ctx[k] }
-                for i in 0..<d {
-                    let x = h[i] * c[i]
-                    if x == 0 { continue }
-                    let row = (2 * d + i) * expertHidden
-                    for k in 0..<expertHidden { a[k] += x * w1[row + k] }
-                }
-                var result = b2[0]
-                for k in 0..<expertHidden where a[k] > 0 { result += a[k] * w2[k] }
-                return result * weight
-            }
+            // nFeat L + 5: the last one is the task flag, 0 here (correcting); predict sets it.
             var input = [Float](repeating: 0, count: nin)
             for j in 0..<d { input[j] = h[j]; input[d + j] = c[j]; input[2 * d + j] = h[j] * c[j] }
             for j in 0..<nFeat { input[3 * d + j] = feats[j] }
@@ -209,31 +162,118 @@ final class Ranker: WordScorer {
     /// Next-word suggestions: scores the most frequent words of the enabled
     /// languages after the context (models from v6 on; earlier ones give
     /// poor suggestions).
+    ///
+    /// Same math as `score`, as matrix products over the whole shortlist
+    /// (Accelerate): a word's head input is [h | c | h*c | feats], and since
+    /// (h*c)·W = c·(diag(h)·W), each keystroke folds its h into one matrix K,
+    /// then scores every word at once as X·K, with X = [c | feats | 1] built
+    /// once per shortlist. ~0.2 ms for 2000 words where the Swift loops took
+    /// 3-10 ms, with the same top 10.
     func predict(count: Int, leadingSpace: Bool) -> [String] {
-        guard let lexicon else { return [] }
-        let mask = lexicon.languages
+        guard let lexicon, !h.isEmpty else { return [] }
         // Round 10 on is trained with one or two languages enabled, so the list
         // is simply the most frequent words of whatever is on.
-        if shortlistMask != mask {
-            predictionCache.removeAll()
-            predictionConstants.removeAll()
-            shortlist = lexicon.completions("", limit: Self.shortlistSize).map(\.word)
+        // The model's own languages, not the word list's: with language
+        // detection the list holds four, and words of the other two got wild
+        // scores ("menos", "seiner" after "go to the").
+        let mask = languages.reduce(UInt8(0)) { $0 | $1.bit }
+        if shortlistMask != mask || shortlistLanguages != languages {
+            shortlist = lexicon.completions("", limit: Self.shortlistSize, languages: mask).map(\.word)
             shortlistMask = mask
+            shortlistLanguages = languages
+            buildShortlistInputs(lexicon)
         }
-        let saved = typed
-        typed = nil  // nothing typed yet
-        predicting = true
-        let s = score(shortlist, leadingSpace: leadingSpace)
-        predicting = false
-        typed = saved
-        return s.indices.sorted { s[$0] > s[$1] }.prefix(count).map { shortlist[$0] }
+        let n = shortlist.count
+        guard n > 0 else { return [] }
+        let e = experts > 0 ? expert : 0, nin = 3 * dim + nFeat
+        var s = [Float](repeating: b2[e] + (hasShared ? sb2 : 0), count: n)
+        shortlistHead(w1, base: e * nin * expertHidden, units: expertHidden, bias: b1, biasAt: e * expertHidden,
+                      out: w2, outAt: e * expertHidden, into: &s)
+        if hasShared { shortlistHead(sw1, base: 0, units: hidden, bias: sb1, biasAt: 0, out: sw2, outAt: 0, into: &s) }
+        // Top `count` in one pass.
+        var best: [(score: Float, index: Int)] = []
+        for i in 0..<n where best.count < count || s[i] > best[best.count - 1].score {
+            if best.count == count { best.removeLast() }
+            let at = best.firstIndex { $0.score < s[i] } ?? best.count
+            best.insert((s[i], i), at: at)
+        }
+        return best.map { shortlist[$0.index] }
     }
 
     /// Words considered for suggestions (must match the model).
     static let shortlistSize = 2000
     private var shortlist: [String] = []
     private var shortlistMask: UInt8?
-    private var predicting = false
+    private var shortlistLanguages: [PredictionLanguage] = []
+    /// [shortlist word][c (dim) | feats (nFeat) | 1]: the per-word part of
+    /// the head's input, fixed for a shortlist and language set.
+    private var shortlistX: [Float] = []
+    /// Hidden-layer scratch, [word][unit].
+    private var shortlistA: [Float] = []
+
+    private func buildShortlistInputs(_ lexicon: Lexicon) {
+        let n = shortlist.count, d = dim, cols = d + nFeat + 1
+        var v = [Float](repeating: 0, count: n * d)
+        for (r, word) in shortlist.enumerated() {
+            let w = wordVector(word.lowercased().replacingOccurrences(of: "’", with: "'"))
+            v.replaceSubrange(r * d..<(r + 1) * d, with: w)
+        }
+        // c = v·cprojWᵀ + cprojB, all words at once.
+        var c = [Float](repeating: 0, count: n * d)
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, Int32(n), Int32(d), Int32(d),
+                    1, v, Int32(d), cprojW, Int32(d), 0, &c, Int32(d))
+        let bits = langBits()
+        var x = [Float](repeating: 0, count: n * cols)
+        for (r, word) in shortlist.enumerated() {
+            let row = r * cols
+            for i in 0..<d { x[row + i] = c[r * d + i] + cprojB[i] }
+            // The features `score` builds, with nothing typed.
+            let z = zipfs(word.lowercased())
+            var zmax: Float = 0
+            for l in 0..<nLang { x[row + d + l] = z[l] * bits[l] / 8; zmax = max(zmax, z[l] * bits[l]) }
+            x[row + d + nLang] = zmax / 8
+            x[row + d + nLang + 1] = zmax == 0 ? 1 : 0
+            if nFeat == nLang + 5 { x[row + d + nLang + 4] = 1 }  // task flag: suggesting
+            x[row + cols - 1] = 1
+        }
+        shortlistX = x
+        shortlistA = [Float](repeating: 0, count: n * max(expertHidden, hidden))
+    }
+
+    /// s += relu(X·K)·out for one head, K holding this keystroke's h:
+    /// rows for c are W[c] + diag(h)·W[h*c], then W[feats], then the bias
+    /// row b + hᵀ·W[h].
+    private func shortlistHead(_ W: [Float], base: Int, units: Int, bias: [Float], biasAt: Int,
+                               out: [Float], outAt: Int, into s: inout [Float]) {
+        let n = shortlist.count, d = dim, cols = d + nFeat + 1
+        var k = [Float](repeating: 0, count: cols * units)
+        for i in 0..<d {
+            let hc = h[i], c = base + (d + i) * units, hcRow = base + (2 * d + i) * units
+            for u in 0..<units { k[i * units + u] = W[c + u] + hc * W[hcRow + u] }
+        }
+        for f in 0..<nFeat {
+            let r = base + (3 * d + f) * units
+            for u in 0..<units { k[(d + f) * units + u] = W[r + u] }
+        }
+        let biasRow = (d + nFeat) * units
+        for u in 0..<units { k[biasRow + u] = bias[biasAt + u] }
+        k.withUnsafeMutableBufferPointer { kk in
+            W.withUnsafeBufferPointer { w in
+                cblas_sgemv(CblasRowMajor, CblasTrans, Int32(d), Int32(units), 1, w.baseAddress! + base, Int32(units),
+                            h, 1, 1, kk.baseAddress! + biasRow, 1)
+            }
+        }
+        shortlistA.withUnsafeMutableBufferPointer { a in
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, Int32(n), Int32(units), Int32(cols),
+                        1, shortlistX, Int32(cols), k, Int32(units), 0, a.baseAddress, Int32(units))
+            var zero: Float = 0
+            vDSP_vthres(a.baseAddress!, 1, &zero, a.baseAddress!, 1, vDSP_Length(n * units))
+            out.withUnsafeBufferPointer { o in
+                cblas_sgemv(CblasRowMajor, CblasNoTrans, Int32(n), Int32(units), weight, a.baseAddress, Int32(units),
+                            o.baseAddress! + outAt, 1, 1, &s, 1)
+            }
+        }
+    }
 
     // MARK: Pieces
 
@@ -253,8 +293,17 @@ final class Ranker: WordScorer {
         return s
     }
 
+    /// Only the languages the model knows: a 4-language model ignores Italian
+    /// and Portuguese.
     private func langBits() -> [Float] {
-        PredictionLanguage.allCases.map { languages.contains($0) ? 1 : 0 }
+        PredictionLanguage.allCases.prefix(nLang).map { languages.contains($0) ? 1 : 0 }
+    }
+
+    /// The word list's frequencies, one per model language (the list may
+    /// hold more or fewer languages than the model).
+    private func zipfs(_ word: String) -> [Float] {
+        let z = lexicon?.zipfs(of: word) ?? []
+        return (0..<nLang).map { $0 < z.count ? z[$0] : 0 }
     }
 
     /// Mean of the word's n-gram vectors (dequantized).

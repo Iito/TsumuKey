@@ -27,13 +27,25 @@ struct KeyboardView: View {
         }
         .frame(height: Metrics.totalHeight(state.settings))
         .background(Palette.background)
+        .coordinateSpace(name: "root")
+        .onPreferenceChange(ChipFramePreference.self) { chipFrame = $0 }
+        .overlay(alignment: .topLeading) {
+            if !state.choices.isEmpty, state.choicesDropDown {
+                JapaneseChoiceMenu(state: state, chip: chipFrame)
+            }
+        }
     }
+
+    /// Where the Japanese chip sits, for the long-press menu.
+    @State private var chipFrame: CGRect = .zero
 
     private var keys: some View {
         GeometryReader { geo in
             Group {
                 if state.mode == .emoji {
                     EmojiPanel(state: state, size: geo.size)
+                } else if !state.choices.isEmpty, !state.choicesDropDown {
+                    ChoiceGrid(state: state)
                 } else {
                     grid(size: geo.size)
                 }
@@ -299,7 +311,8 @@ struct KeyView: View {
                 Text("space").font(.system(size: 15))
             } else if state.mode == .letters {
                 // The prediction languages, like Gboard's "EN · FR".
-                Text(state.settings.predictionLanguages.map { $0.rawValue.uppercased() }.joined(separator: " · "))
+                Text((state.settings.autoLanguages ? state.activeLanguages : state.settings.manualLanguages)
+                    .map { $0.rawValue.uppercased() }.joined(separator: " · "))
                     .font(.system(size: 14)).foregroundStyle(.secondary)
             }
         case .returnKey:
@@ -720,6 +733,19 @@ private struct SuggestionBar: View {
         return list
     }
 
+    /// `entries` with the emoji in the last slot, in place of a plain word
+    /// (never the pending fix, the word as typed or the Japanese chip).
+    private var entriesWithEmoji: [(label: String, word: String, isCorrection: Bool, isJapanese: Bool)] {
+        var list = entries
+        guard state.mathResults.isEmpty, let emoji = state.emojiSuggestion else { return list }
+        if list.count >= 3 {
+            guard let i = list.lastIndex(where: { !$0.2 && !$0.3 && $0.0 == $0.1 }) else { return list }
+            list.remove(at: i)
+        }
+        list.append((emoji, emoji, false, false))
+        return list
+    }
+
     var body: some View {
         if state.mode.isJapanese && !state.kanaCandidates.isEmpty {
             kanaRow
@@ -779,28 +805,54 @@ private struct SuggestionBar: View {
                 .buttonStyle(.plain)
                 if !state.suggestions.isEmpty { Divider().frame(height: 22) }
             }
-            if entries.isEmpty, let note = state.setupNote {
+            if entriesWithEmoji.isEmpty, let note = state.setupNote {
                 Text(note)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity)
             }
-            ForEach(Array(entries.enumerated()), id: \.offset) { index, item in
+            ForEach(Array(entriesWithEmoji.enumerated()), id: \.offset) { index, item in
                 if index > 0 { Divider().frame(height: 22) }
+                // Tap picks; a long press opens the grid of alternatives (the
+                // Japanese chip: its conversions).
+                let isEmoji = !item.isCorrection && item.word == state.emojiSuggestion
+                let math = state.mathResults.first(where: { $0.text == item.word })
+                MorphText(text: item.label)
+                    .font(.system(size: item.isJapanese ? 17 : 16, weight: item.isCorrection ? .semibold : .regular))
+                    .foregroundStyle(item.isJapanese ? Color.red : Color.primary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if item.isJapanese { state.pickJapanese() }
+                        else if isEmoji { state.pickEmoji() }
+                        else if let math { state.pickMath(math) }
+                        else { state.pick(suggestion: item.word) }
+                    }
+                    .onLongPressGesture(minimumDuration: 0.4) {
+                        if item.isJapanese { state.showJapaneseChoices() }
+                        else if !isEmoji, math == nil { state.showWordChoices(pressed: item.word) }
+                    }
+                    .background(GeometryReader { g in
+                        Color.clear.preference(key: ChipFramePreference.self,
+                                               value: item.isJapanese ? g.frame(in: .named("root")) : .zero)
+                    })
+            }
+            // ⌄ for the Japanese conversions (grid style); ⌃ closes any grid.
+            if !state.choices.isEmpty && !state.choicesDropDown
+                || state.choices.isEmpty && state.hasJapaneseChoices && state.settings.japaneseChoices == .grid {
                 Button {
-                    if item.isJapanese { state.pickJapanese() }
-                    else if let r = state.mathResults.first(where: { $0.text == item.word }) { state.pickMath(r) }
-                    else { state.pick(suggestion: item.word) }
+                    state.keyDown()
+                    state.toggleChoices()
                 } label: {
-                    MorphText(text: item.label)
-                        .font(.system(size: item.isJapanese ? 17 : 16,
-                                      weight: item.isCorrection ? .semibold : .regular))
-                        .foregroundStyle(item.isJapanese ? Color.red : Color.primary)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    Image(systemName: state.choices.isEmpty ? "chevron.down" : "chevron.up")
+                        .font(.system(size: 17, weight: .semibold))
+                        .frame(width: 40)
+                        .frame(maxHeight: .infinity)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("More conversions")
             }
             if state.inAppField || state.settings.hideKeyboardButton {
                 Divider().frame(height: 22)
@@ -886,6 +938,92 @@ private struct MorphText: View {
             }
             nextID = id
             return result
+        }
+    }
+}
+
+struct ChipFramePreference: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let next = nextValue()
+        if next != .zero { value = next }
+    }
+}
+
+/// Long press on the Japanese chip in the ABC keyboard: its top 10
+/// conversions, dropping down from the chip over the keys. A tap outside
+/// closes it; typing never reaches the keys while it's open.
+private struct JapaneseChoiceMenu: View {
+    @ObservedObject var state: KeyboardState
+    let chip: CGRect
+    private let rowHeight: CGFloat = 42
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = min(max(chip.width, 170), geo.size.width - 12)
+            let x = min(max(chip.midX - width / 2, 6), geo.size.width - width - 6)
+            let top = Metrics.suggestionBarHeight
+            let height = min(CGFloat(state.choices.count) * rowHeight, geo.size.height - top - 6)
+            ZStack(alignment: .topLeading) {
+                Color.black.opacity(0.001)
+                    .onTapGesture { state.hideChoices() }
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(state.choices.enumerated()), id: \.offset) { index, text in
+                            if index > 0 { Divider() }
+                            Button {
+                                state.keyDown()
+                                state.pickChoice(index)
+                            } label: {
+                                Text(text)
+                                    .font(.system(size: 18, weight: index == 0 ? .semibold : .regular))
+                                    .lineLimit(1)
+                                    .foregroundStyle(Color.red)
+                                    .frame(maxWidth: .infinity, minHeight: rowHeight)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .frame(width: width, height: height)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .shadow(color: .black.opacity(0.25), radius: 8, y: 3)
+                .offset(x: x, y: top)
+            }
+        }
+    }
+}
+
+/// The long-press grid: the bar word's alternatives (or the Japanese
+/// conversions) in place of the keys, four to a row, like the iOS kana
+/// keyboard's expanded candidates. ⌃ in the bar or picking one brings the
+/// keys back.
+private struct ChoiceGrid: View {
+    @ObservedObject var state: KeyboardState
+
+    var body: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 0), count: 4), spacing: 0) {
+                ForEach(Array(state.choices.enumerated()), id: \.offset) { index, text in
+                    Button {
+                        state.keyDown()
+                        state.pickChoice(index)
+                    } label: {
+                        Text(text)
+                            .font(.system(size: 21, weight: index == 0 ? .semibold : .regular))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .foregroundStyle(Color.primary)
+                            .padding(.horizontal, 4)
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 6)
         }
     }
 }

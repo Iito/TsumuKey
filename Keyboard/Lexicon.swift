@@ -17,7 +17,8 @@ final class Lexicon {
 
     private let data: Data
     private let count: Int
-    private static let languageCount = 4
+    /// Frequencies stored per word: 4 in BKW2, any number in BKW3.
+    let languageCount: Int
     /// Bit i on = language i (PredictionLanguage order) is used. Only touch
     /// it from the queue that reads the lexicon.
     var languages: UInt8 = 0b11
@@ -25,17 +26,21 @@ final class Lexicon {
 
     init?(url: URL) {
         guard let data = try? Data(contentsOf: url, options: .alwaysMapped), data.count > 8,
-              data.prefix(4) == Data("BKW2".utf8) else { return nil }
+              ["BKW2", "BKW3"].contains(String(decoding: data.prefix(4), as: UTF8.self)) else { return nil }
         let read = { (offset: Int) in Int(data.withUnsafeBytes { $0.loadUnaligned(fromByteOffset: offset, as: UInt32.self) }) }
         let count = read(4)
-        let wordOffsets = 8 + (count + 1) * 4
+        // BKW3 adds u32 language count after the word count.
+        let v3 = data[data.startIndex + 3] == UInt8(ascii: "3")
+        let header = v3 ? 12 : 8
+        languageCount = v3 ? read(8) : 4
+        let wordOffsets = header + (count + 1) * 4
         let zipfs = wordOffsets + (count + 1) * 4
         self.data = data
         self.count = count
-        keyOffsets = 8
+        keyOffsets = header
         self.wordOffsets = wordOffsets
         self.zipfs = zipfs
-        keys = zipfs + count * Self.languageCount
+        keys = zipfs + count * languageCount
         // The last key offset is the keys blob's length.
         words = keys + read(wordOffsets - 4)
     }
@@ -56,40 +61,42 @@ final class Lexicon {
     /// Frequency of this exact spelling in each language (PredictionLanguage
     /// order), whatever is enabled; zeros when it isn't in the list.
     func zipfs(of word: String) -> [Float] {
-        guard let key = Self.key(word) else { return [0, 0, 0, 0] }
+        guard let key = Self.key(word) else { return [Float](repeating: 0, count: languageCount) }
         let k = Array(key.utf8)
         var i = lowerBound(k)
         while i < count, compare(i, k) == 0 {
             let start = words + u32(wordOffsets + i * 4), end = words + u32(wordOffsets + (i + 1) * 4)
             let w = data.withUnsafeBytes { String(decoding: $0[start..<end], as: UTF8.self) }
             if w == word {
-                let base = data.startIndex + zipfs + i * Self.languageCount
-                return (0..<Self.languageCount).map { Float(data[base + $0]) / 10 }
+                let base = data.startIndex + zipfs + i * languageCount
+                return (0..<languageCount).map { Float(data[base + $0]) / 10 }
             }
             i += 1
         }
-        return [0, 0, 0, 0]
+        return [Float](repeating: 0, count: languageCount)
     }
 
-    func contains(_ key: String) -> Bool {
+    /// `languages`: a mask other than `self.languages` (suggestions use the
+    /// model's two languages while corrections search more).
+    func contains(_ key: String, languages mask: UInt8? = nil) -> Bool {
         let k = Array(key.utf8)
         var i = lowerBound(k)
         while i < count, compare(i, k) == 0 {
-            if zipfByte(i) > 0 { return true }
+            if zipfByte(i, mask ?? languages) > 0 { return true }
             i += 1
         }
         return false
     }
 
     /// The most frequent words whose key starts with `prefix` (longer than it).
-    func completions(_ prefix: String, limit: Int) -> [Entry] {
+    func completions(_ prefix: String, limit: Int, languages mask: UInt8? = nil) -> [Entry] {
         let p = Array(prefix.utf8)
         var i = lowerBound(p)
         var best: [(index: Int, zipf: UInt8)] = []
         // Short prefixes match thousands of words; frequencies are one byte
         // each, so scanning them all is still only microseconds.
         while i < count, hasPrefix(i, p) {
-            let z = zipfByte(i)
+            let z = zipfByte(i, mask ?? languages)
             if z > 0, keyLength(i) > p.count, best.count < limit || z > best[best.count - 1].zipf {
                 if best.count == limit { best.removeLast() }
                 let at = best.firstIndex { $0.zipf < z } ?? best.count
@@ -97,7 +104,7 @@ final class Lexicon {
             }
             i += 1
         }
-        return best.map { entry($0.index) }
+        return best.map { entry($0.index, mask ?? languages) }
     }
 
     /// Visits every distinct key in sorted order, like walking a trie:
@@ -163,17 +170,18 @@ final class Lexicon {
     private func keyLength(_ i: Int) -> Int { keyRange(i).count }
     /// Highest frequency among the enabled languages; 0 when it's a word
     /// in none of them.
-    private func zipfByte(_ i: Int) -> UInt8 {
-        let base = data.startIndex + zipfs + i * Self.languageCount
+    private func zipfByte(_ i: Int, _ mask: UInt8? = nil) -> UInt8 {
+        let mask = mask ?? languages
+        let base = data.startIndex + zipfs + i * languageCount
         var best: UInt8 = 0
-        for l in 0..<Self.languageCount where languages & (1 << l) != 0 { best = max(best, data[base + l]) }
+        for l in 0..<languageCount where mask & (1 << l) != 0 { best = max(best, data[base + l]) }
         return best
     }
 
-    private func entry(_ i: Int) -> Entry {
+    private func entry(_ i: Int, _ mask: UInt8? = nil) -> Entry {
         let start = words + u32(wordOffsets + i * 4), end = words + u32(wordOffsets + (i + 1) * 4)
         let word = data.withUnsafeBytes { String(decoding: $0[start..<end], as: UTF8.self) }
-        return Entry(word: word, zipf: Float(zipfByte(i)) / 10)
+        return Entry(word: word, zipf: Float(zipfByte(i, mask)) / 10)
     }
 
     /// Byte order comparison of entry i's key with `k`.

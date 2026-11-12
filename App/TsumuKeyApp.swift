@@ -121,9 +121,19 @@ struct ContentView: View {
                     let picked = codes.split(separator: ",").compactMap { PredictionLanguage(rawValue: String($0)) }
                     if !picked.isEmpty { settings.predictionLanguages = picked; settings.save() }
                 }
+                // UI tests: "-textMode letters|romaji|kana|hangul": the mode the keyboard starts in.
+                if let mode = args.string(forKey: "textMode") {
+                    SharedSettings.defaults.set(mode, forKey: "startTextMode")
+                    settings.save()
+                }
+                // UI tests: "-autoLanguages 0|1" turns language detection off or on.
+                if args.object(forKey: "autoLanguages") != nil { settings.autoLanguages = args.bool(forKey: "autoLanguages"); settings.save() }
                 // UI tests: "-alphabet korean|japanese|none" picks the other alphabet.
                 if let name = UserDefaults.standard.string(forKey: "alphabet"),
                    let a = AsianLanguage(rawValue: name) { settings.asianLanguage = a; settings.save() }
+                // UI tests: "-japaneseInput kana|romaji" picks the Japanese keyboard.
+                if let name = UserDefaults.standard.string(forKey: "japaneseInput"),
+                   let j = JapaneseInput(rawValue: name) { settings.japaneseInput = j; settings.save() }
                 // UI tests: "-model gemma|dense|moe" picks the correction model.
                 if let name = UserDefaults.standard.string(forKey: "model"),
                    let m = CorrectionModel(rawValue: name) { settings.correctionModel = m; settings.save() }
@@ -360,7 +370,8 @@ extension ContentView {
     }
 
     private var barSummary: String {
-        let on = [settings.mathResults ? "Maths" : nil, settings.currencyConversion ? "Currency" : nil].compactMap { $0 }
+        let on = [settings.emojiSuggestions ? "Emoji" : nil, settings.mathResults ? "Maths" : nil,
+                  settings.currencyConversion ? "Currency" : nil].compactMap { $0 }
         return on.isEmpty ? "Words only" : on.joined(separator: ", ")
     }
 
@@ -396,7 +407,15 @@ extension ContentView {
                 Picker("Japanese keyboard", selection: $settings.japaneseInput) {
                     ForEach(JapaneseInput.allCases) { Text($0.name).tag($0) }
                 }
+                Picker("Unconverted text", selection: $settings.japaneseComposition) {
+                    ForEach(JapaneseComposition.allCases) { Text($0.name).tag($0) }
+                }
                 Toggle("Japanese in ABC", isOn: $settings.japaneseInLatin)
+                if settings.japaneseInLatin {
+                    Picker("More conversions", selection: $settings.japaneseChoices) {
+                        ForEach(JapaneseChoices.allCases) { Text($0.name).tag($0) }
+                    }
+                }
             case .korean:
                 Picker("Korean keyboard", selection: $settings.koreanInput) {
                     ForEach(KoreanInput.allCases) { Text($0.name).tag($0) }
@@ -444,10 +463,12 @@ extension ContentView {
     private var barPage: some View {
         Form {
             Section {
+                Toggle("Emoji", isOn: $settings.emojiSuggestions)
                 Toggle("Maths results", isOn: $settings.mathResults)
                 Toggle("Currency conversion", isOn: $settings.currencyConversion)
             } header: {
                 InfoHeader("In the Suggestion Bar", info: [
+                    "Emoji: a word that names one (pizza, dog, merci, hund) offers it in the bar, also just after you finish the word; tap it to add it after the word. In English, French, German and Spanish.",
                     "Maths results: type a sum and = (12*3=, (4+5)/2 =) and the result shows in the bar; tap it to type it.",
                     "Currency conversion: an amount with $ \u{20AC} \u{00A3} \u{00A5} (100\u{20AC}, $20) shows it in the three main other currencies; tap one to swap. \u{201C}100 usd in chf=\u{201D} converts to any currency the European Central Bank lists.",
                     "Rates: the app fetches the European Central Bank's daily rates, about once a day, only while this is on. The keyboard stays offline. Turning it off deletes the rates.",
@@ -481,7 +502,7 @@ extension ContentView {
                     "Holding 123 opens the other number layout.",
                     "Long-press still shows symbols when they're hidden on the keys.",
                     "Quick currency sits on the third key of the middle row (D on QWERTY, S on Colemak, E on Dvorak); long-press it for the others.",
-                    "Emoji skin tone applies to the emoji panel and search; long-press an emoji there for the other tones.",
+                    "Emoji skin tone applies to the emoji panel, search and the suggestion bar; long-press an emoji there for the other tones.",
                 ])
             }
         }

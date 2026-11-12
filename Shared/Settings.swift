@@ -143,6 +143,8 @@ struct KeyboardSettings: Codable, Equatable {
     var smartPunctuation = true
     /// "12*3=" offers 36 in the bar.
     var mathResults = true
+    /// "pizza" offers 🍕 in the bar.
+    var emojiSuggestions = true
     /// "100$ in €=" in the bar. Off by default: the app then fetches daily
     /// rates from the European Central Bank (the keyboard stays offline).
     var currencyConversion = false
@@ -152,6 +154,10 @@ struct KeyboardSettings: Codable, Equatable {
     var letterColors = LetterColors()
     /// Kanji/kana for romaji words, offered in the ABC keyboard's bar.
     var japaneseInLatin = true
+    /// How kana not yet converted show in the field.
+    var japaneseComposition: JapaneseComposition = .plain
+    /// How the ABC keyboard lists the Japanese word's other conversions.
+    var japaneseChoices: JapaneseChoices = .grid
     /// The Japanese keyboard: the あ key and the ⚙︎ menu switch to this one.
     var japaneseInput: JapaneseInput = .kana
     /// The one Asian language next to the European ones: its keyboard is in
@@ -168,11 +174,18 @@ struct KeyboardSettings: Codable, Equatable {
     /// Languages the bar and autocorrect use: 1 or 2. More would make
     /// autocorrect swap right words for look-alikes in another language.
     var predictionLanguages: [PredictionLanguage] = [.english, .french]
+    /// Detect the language from the words typed: autocorrect searches the word
+    /// lists of every language in `predictionLanguages` (up to all of them), and
+    /// the model gets the two of them your recent words read as.
+    var autoLanguages = true
     /// Which model judges corrections (Gemma, or a small ranker; bench option).
     var correctionModel: CorrectionModel = .dense
 
     static let maxMenuLayouts = 3
     static let maxPredictionLanguages = 2
+    /// Without detection: the first two of the list (with detection the
+    /// list is what it may pick from, up to all of them).
+    var manualLanguages: [PredictionLanguage] { Array(predictionLanguages.prefix(Self.maxPredictionLanguages)) }
     static let rowHeightRange: ClosedRange<Double> = 40...64
 
     init() {}
@@ -199,11 +212,14 @@ struct KeyboardSettings: Codable, Equatable {
         hapticStrength = try c.decodeIfPresent(Double.self, forKey: .hapticStrength) ?? d.hapticStrength
         smartPunctuation = try c.decodeIfPresent(Bool.self, forKey: .smartPunctuation) ?? d.smartPunctuation
         mathResults = try c.decodeIfPresent(Bool.self, forKey: .mathResults) ?? d.mathResults
+        emojiSuggestions = try c.decodeIfPresent(Bool.self, forKey: .emojiSuggestions) ?? d.emojiSuggestions
         currencyConversion = try c.decodeIfPresent(Bool.self, forKey: .currencyConversion) ?? d.currencyConversion
         theme = try c.decodeIfPresent(KeyboardTheme.self, forKey: .theme) ?? d.theme
         numberKeyTap = try c.decodeIfPresent(NumberKeyTap.self, forKey: .numberKeyTap) ?? d.numberKeyTap
         letterColors = try c.decodeIfPresent(LetterColors.self, forKey: .letterColors) ?? d.letterColors
         japaneseInLatin = try c.decodeIfPresent(Bool.self, forKey: .japaneseInLatin) ?? d.japaneseInLatin
+        japaneseChoices = try c.decodeIfPresent(JapaneseChoices.self, forKey: .japaneseChoices) ?? d.japaneseChoices
+        japaneseComposition = try c.decodeIfPresent(JapaneseComposition.self, forKey: .japaneseComposition) ?? d.japaneseComposition
         // Build 74 had "off" here; it's now Asian language "none".
         let japanese = try c.decodeIfPresent(String.self, forKey: .japaneseInput)
         japaneseInput = japanese.flatMap(JapaneseInput.init) ?? d.japaneseInput
@@ -217,7 +233,8 @@ struct KeyboardSettings: Codable, Equatable {
             ?? [layout] + d.menuLayouts.filter { $0 != layout }
         menuLayouts = menu.isEmpty ? d.menuLayouts : Array(menu.prefix(Self.maxMenuLayouts))
         let languages = try c.decodeIfPresent([PredictionLanguage].self, forKey: .predictionLanguages) ?? d.predictionLanguages
-        predictionLanguages = languages.isEmpty ? d.predictionLanguages : Array(languages.prefix(Self.maxPredictionLanguages))
+        autoLanguages = try c.decodeIfPresent(Bool.self, forKey: .autoLanguages) ?? d.autoLanguages
+        predictionLanguages = languages.isEmpty ? d.predictionLanguages : Array(languages.prefix(PredictionLanguage.allCases.count))
         correctionModel = try c.decodeIfPresent(CorrectionModel.self, forKey: .correctionModel) ?? d.correctionModel
     }
 
@@ -229,9 +246,9 @@ struct KeyboardSettings: Codable, Equatable {
 }
 
 /// Languages the keyboard can predict and correct in. One model and one word
-/// list cover all four; the settings pick which ones are used.
+/// list cover them all; the settings pick which ones are used.
 enum PredictionLanguage: String, Codable, CaseIterable, Identifiable {
-    case english = "en", french = "fr", german = "de", spanish = "es"
+    case english = "en", french = "fr", german = "de", spanish = "es", italian = "it", portuguese = "pt"
 
     var id: Self { self }
     var name: String {
@@ -240,6 +257,8 @@ enum PredictionLanguage: String, Codable, CaseIterable, Identifiable {
         case .french: return "French"
         case .german: return "German"
         case .spanish: return "Spanish"
+        case .italian: return "Italian"
+        case .portuguese: return "Portuguese"
         }
     }
     /// Bit in the word list's per-word language mask.
@@ -263,6 +282,27 @@ enum CorrectionModel: String, Codable, CaseIterable, Identifiable {
 
     /// What the picker offers; the MoE ranker has no suggestions and stays bench-only.
     static let choices: [CorrectionModel] = [.dense, .gemma]
+}
+
+/// Kana not yet converted, in the text field: underlined like the iOS
+/// keyboard (marked text), or plain text edited in place. Plain: SwiftUI
+/// text fields clear normally after Send; after marked text they keep
+/// showing the old text.
+enum JapaneseComposition: String, Codable, CaseIterable, Identifiable {
+    case plain, underlined
+
+    var id: Self { self }
+    var name: String { self == .plain ? "Plain" : "Underlined" }
+}
+
+/// The Japanese word's other conversions in the ABC keyboard: a grid in
+/// place of the keys (⌄ at the end of the bar, like iOS), or a list that
+/// drops down from the word when it's held.
+enum JapaneseChoices: String, Codable, CaseIterable, Identifiable {
+    case grid, dropDown
+
+    var id: Self { self }
+    var name: String { self == .grid ? "Grid" : "Drop-down" }
 }
 
 enum JapaneseInput: String, Codable, CaseIterable, Identifiable {

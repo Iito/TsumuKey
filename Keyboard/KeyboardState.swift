@@ -52,7 +52,7 @@ final class KeyboardState: ObservableObject {
     @Published var mode: KeyboardMode = .letters
     /// Latin or kana: where the numpad and emoji panel go back to, and what
     /// the keyboard opens with. Remembered across launches.
-    var textMode: KeyboardMode = UserDefaults.standard.string(forKey: "textMode")
+    var textMode: KeyboardMode = KeyboardState.takeStartMode() ?? UserDefaults.standard.string(forKey: "textMode")
         .flatMap(KeyboardMode.init) ?? .letters {
         didSet { UserDefaults.standard.set(textMode.rawValue, forKey: "textMode") }
     }
@@ -109,8 +109,7 @@ final class KeyboardState: ObservableObject {
                 KoreanWords.shared.load()
                 DispatchQueue.main.async { [weak self] in self?.textChanged() }
             }
-            Suggester.languages = settings.predictionLanguages
-            predictor.setLanguages(settings.predictionLanguages)
+            applyLanguages()
             predictor.setModel(settings.correctionModel)
             predictor.load()
         } else {
@@ -120,11 +119,60 @@ final class KeyboardState: ObservableObject {
             if koreanInABC {
                 DispatchQueue.global(qos: .userInitiated).async { KoreanWords.shared.load() }
             }
-            Suggester.languages = settings.predictionLanguages
-            predictor.setLanguages(settings.predictionLanguages)
+            applyLanguages()
             predictor.setModel(settings.correctionModel)
             predictor.load()
         }
+    }
+
+    // MARK: Language detection
+
+    /// The languages the model favours: with detection on, the two the last
+    /// finished words read as (kept from field to field), else the settings.
+    @Published private(set) var activeLanguages: [PredictionLanguage] = {
+        let saved = (SharedSettings.defaults.stringArray(forKey: "detectedLanguages") ?? [])
+            .compactMap(PredictionLanguage.init(rawValue:))
+        return saved.isEmpty ? KeyboardSettings.load().manualLanguages : saved
+    }()
+    private lazy var langDetector = Bundle.main.url(forResource: "langid", withExtension: "tkl")
+        .flatMap(LangDetector.init(url:))
+
+    private func applyLanguages() {
+        // Detection picks among the listed languages: drop any no longer listed.
+        if settings.autoLanguages, !activeLanguages.allSatisfy(settings.predictionLanguages.contains) {
+            let kept = activeLanguages.filter(settings.predictionLanguages.contains)
+            activeLanguages = kept.isEmpty ? settings.manualLanguages : kept
+        }
+        let langs = settings.autoLanguages ? activeLanguages : settings.manualLanguages
+        // The iOS spell checker costs per language: the active two only. The
+        // decoder itself knows every list's words (real-word margin).
+        Suggester.languages = langs
+        predictor.setLanguages(langs, lexicon: settings.autoLanguages ? settings.predictionLanguages : langs)
+    }
+
+    /// Recent words' languages (see LangTracker), kept across launches.
+    private var langTracker: LangTracker = SharedSettings.load(LangTracker.self, key: "langTracker") ?? LangTracker()
+    /// Length of the finished text last seen, so each word counts once.
+    private var langSeen = 0
+
+    /// `finished`: the text before the word being typed. Each newly finished
+    /// word goes into the tracker; the model gets its top two languages. Until
+    /// two words have been seen, the last detected languages stay.
+    private func detectLanguages(_ finished: String) {
+        guard settings.autoLanguages, let detector = langDetector else { return }
+        let length = finished.count
+        defer { langSeen = length }
+        // Only a word just finished (a separator typed after it), not deletions.
+        guard length > langSeen, let last = finished.last, !last.isLetter,
+              let word = LangDetector.words(String(finished.suffix(80))).last else { return }
+        langTracker.add(detector.wordLogProbs(word))
+        SharedSettings.save(langTracker, key: "langTracker", notify: false)
+        guard let ranked = langTracker.ranked(detector, among: settings.predictionLanguages) else { return }
+        let top = PredictionLanguage.allCases.filter(ranked.prefix(2).contains)
+        guard top != activeLanguages else { return }
+        activeLanguages = top
+        SharedSettings.defaults.set(top.map(\.rawValue), forKey: "detectedLanguages")
+        applyLanguages()
     }
 
     // MARK: Hangul
@@ -170,8 +218,12 @@ final class KeyboardState: ObservableObject {
     /// for new candidates.
     private func updateComposition(requestCandidates: Bool = true) {
         guard isComposing else {
-            proxy?.setMarkedText("", selectedRange: NSRange(location: 0, length: 0))
-            proxy?.unmarkText()
+            if settings.japaneseComposition == .plain {
+                showComposition("")
+            } else {
+                proxy?.setMarkedText("", selectedRange: NSRange(location: 0, length: 0))
+                proxy?.unmarkText()
+            }
             clearComposition()
             return
         }
@@ -181,16 +233,49 @@ final class KeyboardState: ObservableObject {
             rest.prefixComplete(composingCount: candidates[i].composingCount)
             shown = candidates[i].text + rest.convertTarget
         }
-        proxy?.setMarkedText(shown, selectedRange: NSRange(location: (shown as NSString).length, length: 0))
+        showComposition(shown)
         guard requestCandidates else { return }
+        let english = mode == .romaji ? englishWord(in: composing) : nil
         KanaConverter.shared.candidates(for: composing) { [weak self] found in
             guard let self, self.isComposing else { return }
+            var found = found
+            if let english {
+                found.removeAll { $0.text == english.text }
+                found.insert(english, at: 0)
+            }
             self.candidates = found
             self.kanaCandidates = found.map(\.text)
         }
     }
 
+    /// European word list for the romaji keyboard (memory-mapped, so it
+    /// costs almost no RAM while the European model is unloaded).
+    private lazy var latinLexicon = Bundle.main.url(forResource: "lexicon-eu6", withExtension: "bin")
+        .flatMap(Lexicon.init(url:))
+
+    /// The romaji keys spell a European word that isn't natural Japanese
+    /// ("meeting", "file", "email"): offered first, as typed. Short words
+    /// that read as Japanese stay Japanese ("made" まで, "kite" きて, "to" と).
+    private func englishWord(in text: ComposingText) -> Candidate? {
+        let letters = String(text.input.compactMap { if case let .character(c) = $0.piece { c } else { nil } })
+        guard letters.count >= 3, letters.allSatisfy({ $0.isASCII && $0.isLetter }), let lexicon = latinLexicon else { return nil }
+        lexicon.languages = settings.predictionLanguages.reduce(0) { $0 | $1.bit }
+        guard let entry = lexicon.lookup(letters.lowercased()).first(where: { $0.word == letters.lowercased() }),
+              entry.zipf >= 3 else { return nil }
+        let kana = text.convertTarget
+        // Romaji that doesn't make clean kana: letters left over (えまいl),
+        // or a small vowel that no romaji spelling of a Japanese word gives (ふぃぇ).
+        let leftover = kana.contains { $0.isASCII }
+        let oddSmall = zip(kana, kana.dropFirst()).contains { "ぁぃぅぇぉ".contains($0) && "ぁぃぅぇぉ".contains($1) }
+            || kana.first.map { "ぁぃぅぇぉ".contains($0) } == true
+        guard letters.count >= 5 || leftover || oddSmall else { return nil }
+        let data = [DicdataElement(ruby: letters, cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid, value: 0)]
+        return Candidate(text: letters, value: 0, composingCount: .inputCount(text.input.count),
+                         lastMid: MIDData.一般.mid, data: data)
+    }
+
     private func clearComposition() {
+        plainShown = ""
         composing = ComposingText()
         candidates = []
         if !kanaCandidates.isEmpty { kanaCandidates = [] }
@@ -202,8 +287,7 @@ final class KeyboardState: ObservableObject {
     func commitCandidate(at index: Int) {
         guard index < candidates.count else { return }
         let c = candidates[index]
-        proxy?.setMarkedText(c.text, selectedRange: NSRange(location: (c.text as NSString).length, length: 0))
-        proxy?.unmarkText()
+        commitMarked(c.text)
         KanaConverter.shared.didCommit(c)
         composing.prefixComplete(composingCount: c.composingCount)
         kanaSelected = nil
@@ -219,8 +303,43 @@ final class KeyboardState: ObservableObject {
             commitCandidate(at: i)
             if !isComposing { return }
         }
-        proxy?.unmarkText()
+        commitMarked(composing.convertTarget)
         clearComposition()
+    }
+
+    /// Replaces the composition with `text` as ordinary typing.
+    /// Underlined: committing by unmarking left SwiftUI text fields unaware of
+    /// the text (their binding stayed empty: a chat app's Send saw nothing),
+    /// so the marking is cleared and the text typed. SwiftUI fields still
+    /// won't clear after any marked text (Send, Clear): the plain style avoids it.
+    private func commitMarked(_ text: String) {
+        if settings.japaneseComposition == .plain {
+            showComposition(text)
+            plainShown = ""
+            return
+        }
+        proxy?.setMarkedText("", selectedRange: NSRange(location: 0, length: 0))
+        proxy?.unmarkText()
+        proxy?.insertText(text)
+    }
+
+    /// Plain style: the composition typed as ordinary text, so far.
+    private var plainShown = ""
+
+    /// Shows the reading (or picked candidate) in the field: underlined
+    /// (marked text, like the iOS keyboard), or as plain text that's edited
+    /// in place, only the part that changed (settings.japaneseComposition).
+    private func showComposition(_ shown: String) {
+        guard settings.japaneseComposition == .plain else {
+            proxy?.setMarkedText(shown, selectedRange: NSRange(location: (shown as NSString).length, length: 0))
+            return
+        }
+        let old = Array(plainShown), new = Array(shown)
+        var common = 0
+        while common < old.count, common < new.count, old[common] == new[common] { common += 1 }
+        for _ in common..<old.count { proxy?.deleteBackward() }
+        if common < new.count { proxy?.insertText(String(new[common...])) }
+        plainShown = shown
     }
 
     /// Space while composing: step to the next candidate, like 次候補.
@@ -276,8 +395,18 @@ final class KeyboardState: ObservableObject {
     @Published var settings = KeyboardSettings.load() {
         // The app switched the Japanese keyboard while the other one was up.
         didSet {
+            if let start = Self.takeStartMode() { switchTo(start); return }
             if textMode.isAsian && textMode != asianMode { switchTo(asianMode ?? .letters) }
         }
+    }
+
+    /// UI tests: the mode the app asked the keyboard to be in ("-textMode"),
+    /// once. The keyboard otherwise remembers its mode, and the benches'
+    /// ⚙︎ tap only toggles it.
+    static func takeStartMode() -> KeyboardMode? {
+        guard let raw = SharedSettings.defaults.string(forKey: "startTextMode") else { return nil }
+        SharedSettings.defaults.removeObject(forKey: "startTextMode")
+        return KeyboardMode(rawValue: raw)
     }
     /// Emoji search in progress: letters, space and delete edit this instead
     /// of the document; the suggestion bar shows the query and the matches.
@@ -408,17 +537,18 @@ final class KeyboardState: ObservableObject {
 
     /// Types `s` from a key; spaces and punctuation apply the pending correction first.
     func type(_ s: String) {
-        // "word ." → "word.": the space was from the previous word (or a
-        // picked suggestion), and punctuation belongs against the word.
-        if Self.attachingPunctuation.contains(s), mode != .kana, mode != .romaji {
-            let before = textBefore
-            if before.hasSuffix(" "), let prev = before.dropLast().last,
-               prev.isLetter || prev.isNumber || ")]\"'’”»".contains(prev) {
+        // "word ." + space → "word. ": the space before the mark was from the
+        // previous word (or a picked suggestion). Done at the space, not at the
+        // mark, so a run like "word ..." stays as typed: only a lone mark moves.
+        if s == " " || s == "\n", mode != .kana, mode != .romaji {
+            let before = Array(textBefore.suffix(3))
+            if before.count == 3, before[1] == " ", Self.attachingPunctuation.contains(String(before[2])),
+               before[0].isLetter || before[0].isNumber || ")]\"'’”»".contains(before[0]) {
+                proxy?.deleteBackward()
                 proxy?.deleteBackward()
                 lastCorrection = nil
                 taps = []
-                insert(s)
-                return
+                insert(String(before[2]))
             }
         }
         guard Self.correctionTriggers.contains(s) else {
@@ -651,6 +781,32 @@ final class KeyboardState: ObservableObject {
     @Published private(set) var japaneseChip: Candidate?
     /// Hangul for the romaja word being typed ("annyeong" → 안녕).
     @Published private(set) var koreanChip: String?
+    /// An emoji for the word being typed, or the one just finished ("pizza" → 🍕).
+    @Published private(set) var emojiSuggestion: String?
+
+    private func refreshEmoji(_ word: String) {
+        var found: String?
+        // Not in fields that turn autocorrection off (URLs, addresses, code).
+        if settings.emojiSuggestions, proxy?.autocorrectionType != .no {
+            let before = textBefore
+            let target = word.isEmpty && before.hasSuffix(" ") && !before.hasSuffix("  ")
+                ? String(before.dropLast().reversed().prefix { $0.isLetter }.reversed())
+                : word
+            found = EmojiData.suggestion(for: target).map { EmojiData.toned($0, settings.emojiSkinTone) }
+        }
+        if found != emojiSuggestion { emojiSuggestion = found }
+    }
+
+    /// Types the bar's emoji after the word: "pizza" → "pizza 🍕 ".
+    func pickEmoji() {
+        guard let emoji = emojiSuggestion else { return }
+        emojiSuggestion = nil
+        lateFix = nil
+        taps = []
+        if !currentWord.isEmpty { insert(" ") }
+        insertEmoji(emoji)
+        insert(" ")
+    }
     /// What the red chip shows, Japanese or Korean.
     var chipText: String? { japaneseChip?.text ?? koreanChip }
     /// First in the bar when the word isn't English or French, else last.
@@ -671,9 +827,80 @@ final class KeyboardState: ObservableObject {
         KanaConverter.shared.candidates(for: reading, predict: false, fresh: true) { [weak self] found in
             guard let self, self.mode == .letters, self.currentWord == word else { return }
             // Skip candidates with Latin left over ("gomen" → "ご目n").
-            self.japaneseChip = found.first { !$0.text.contains { $0.isASCII } }
+            var seen = Set<String>()
+            let choices = found.filter { c in !c.text.contains { $0.isASCII } && seen.insert(c.text).inserted }
+            self.japaneseChip = choices.first
+            self.japaneseChoices = Array(choices.prefix(30))
             self.japaneseChipFirst = first
         }
+    }
+
+    /// The chip's top conversions, for the long-press grid or drop-down.
+    private var japaneseChoices: [Candidate] = []
+
+    enum ChoiceKind { case japanese, words }
+    /// The long-press grid (or Japanese drop-down), open while non-empty.
+    @Published private(set) var choices: [String] = []
+    private(set) var choiceKind: ChoiceKind = .words
+    /// The text when it opened: any edit closes it.
+    private var choicesText = ""
+
+    /// The chip has other conversions to list.
+    var hasJapaneseChoices: Bool { japaneseChip != nil && japaneseChoices.count > 1 }
+    /// The Japanese conversions show as a drop-down under the chip.
+    var choicesDropDown: Bool { choiceKind == .japanese && settings.japaneseChoices == .dropDown }
+
+    /// Long press on the Japanese chip: its conversions, the top 10 dropping
+    /// down from it or up to 30 in a grid over the keys (settings.japaneseChoices).
+    func showJapaneseChoices() {
+        guard hasJapaneseChoices else { return }
+        tick()
+        choiceKind = .japanese
+        choicesText = textBefore
+        let count = settings.japaneseChoices == .grid ? 30 : 10
+        choices = japaneseChoices.prefix(count).map(\.text)
+    }
+
+    /// Long press on a word in the bar: the candidates for the word being
+    /// typed (or the next word) that score close to the best, in a grid over
+    /// the keys, the pressed one first. Scored on demand (~0.1 s).
+    func showWordChoices(pressed: String) {
+        let opened = textBefore
+        let typed = mode == .hangul ? hangulWord : currentWord
+        let barWords = [pressed] + (pendingCorrection.map { [$0] } ?? []) + suggestions
+        let open = { [weak self] (scored: [String]) in
+            guard let self, self.textBefore == opened else { return }
+            var seen = Set<String>()
+            var list = (barWords + scored).filter { !$0.isEmpty && seen.insert($0).inserted }
+            if !typed.isEmpty, seen.insert(typed).inserted { list.append(typed) }
+            guard list.count > 1 else { return }
+            self.tick()
+            self.choiceKind = .words
+            self.choicesText = opened
+            self.choices = Array(list.prefix(30))
+        }
+        guard mode == .letters, predictor.isReady else { open([]); return }
+        let request = DecodeRequest(before: String(opened.dropLast(typed.count)), word: typed, taps: taps,
+                                    keys: keyMap, autocorrect: false)
+        predictor.choices(request, completion: open)
+    }
+
+    /// ⌄/⌃ at the end of the bar: the Japanese conversions.
+    func toggleChoices() {
+        if !choices.isEmpty { hideChoices() } else { showJapaneseChoices() }
+    }
+
+    func hideChoices() {
+        if !choices.isEmpty { choices = [] }
+    }
+
+    /// A tap in the grid or drop-down.
+    func pickChoice(_ index: Int) {
+        guard index < choices.count else { return }
+        let word = choices[index]
+        let kind = choiceKind
+        hideChoices()
+        if kind == .japanese { pickJapanese(index) } else { pick(suggestion: word) }
     }
 
     /// The word as kana to convert, or nil when it can't be romaji.
@@ -695,7 +922,8 @@ final class KeyboardState: ObservableObject {
 
     /// Swaps the romaji word for the chip's kanji. No space after: Japanese
     /// doesn't use them.
-    func pickJapanese() {
+    /// `choice`: an index into the long-press row, else the chip itself.
+    func pickJapanese(_ choice: Int? = nil) {
         if japaneseChip == nil, let korean = koreanChip {
             // Korean uses spaces between words, like a picked suggestion.
             lateFix = nil
@@ -705,10 +933,12 @@ final class KeyboardState: ObservableObject {
             insert(korean + " ")
             return
         }
-        guard let candidate = japaneseChip else { return }
+        guard let candidate = choice.flatMap({ japaneseChoices.indices.contains($0) ? japaneseChoices[$0] : nil }) ?? japaneseChip else { return }
         lateFix = nil
         taps = []
         japaneseChip = nil
+        japaneseChoices = []
+        hideChoices()
         for _ in 0..<currentWord.count { proxy?.deleteBackward() }
         insert(candidate.text)
         KanaConverter.shared.didCommit(candidate)
@@ -1063,6 +1293,8 @@ final class KeyboardState: ObservableObject {
             let pasteAvailable = controller?.hasFullAccess == true && UIPasteboard.general.hasStrings
             if pasteAvailable != canPaste { canPaste = pasteAvailable }
         }
+        // The grid stays open until the text changes.
+        if !choices.isEmpty, textBefore != choicesText || !(mode == .letters || mode == .hangul) { choices = [] }
         if mode == .hangul {
             refreshHangulBar()
             return
@@ -1070,11 +1302,13 @@ final class KeyboardState: ObservableObject {
         guard mode == .letters else {
             if japaneseChip != nil { japaneseChip = nil }
             if koreanChip != nil { koreanChip = nil }
+            if emojiSuggestion != nil { emojiSuggestion = nil }
             return
         }
         let word = currentWord
         refreshJapaneseChip(word)
         refreshKoreanChip(word)
+        refreshEmoji(word)
         guard predictor.isReady else {
             // Model still loading: the plain dictionary bar.
             let fix = correction(for: word)
@@ -1083,6 +1317,7 @@ final class KeyboardState: ObservableObject {
             suggestions = Suggester.suggestions(for: word).filter { $0 != fix }
             return
         }
+        detectLanguages(String(textBefore.dropLast(word.count)))
         let request = DecodeRequest(before: String(textBefore.dropLast(word.count)), word: word, taps: taps,
                                     keys: keyMap, autocorrect: autocorrectOn && rejectedWord == nil && !isKnown(word))
         // Mid-word this is the quick estimate only; the full check runs once

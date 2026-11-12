@@ -6,7 +6,7 @@ languages into one keyboard, with no switching. Everything runs on the phone.
 
 ## See it
 
-<p align="center"><img src="docs/media/demo.gif" width="360" alt="Typing hello wrold, autocorrected to Hello world.; a period pulling the space away; romaji converted to Japanese; numpad and symbols; Colemak, QWERTZ and Dvorak layouts"></p>
+<p align="center"><img src="docs/media/demo.gif" width="360" alt="Typing hello wrold, autocorrected to Hello world.; sushi offering 🍣 in the bar; Italian words switching the bar to Italian; a long press opening more suggestions; romaji converted to Japanese; Korean typed on Dubeolsik"></p>
 
 *"hello wrold" becomes "Hello world.", romaji turns into 私は日本語を話す with one tap,
 123 opens a numpad (hold it for symbols), then Colemak, QWERTZ and Dvorak.*

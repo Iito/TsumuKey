@@ -219,10 +219,21 @@ final class TypingBench: XCTestCase {
     /// typing with autocorrect and key popups, punctuation sticking to the word,
     /// the Japanese chip, the 123 key, then the other layouts.
     func testDemo() throws {
+        // iPhone 16 Pro Max, QWERTY with the number row (the default). The
+        // bar's three slots and the grid's ⌄ can be moved with DEMO_* "x,y".
+        let env = ProcessInfo.processInfo.environment
+        func point(_ k: String, _ d: (CGFloat, CGFloat)) -> (CGFloat, CGFloat) {
+            let v = (env[k] ?? "").split(separator: ",").compactMap { Double($0) }
+            return v.count == 2 ? (CGFloat(v[0]), CGFloat(v[1])) : d
+        }
+        let left = point("DEMO_LEFT", (200, 660)), middle = point("DEMO_MIDDLE", (220, 660))
+        let right = point("DEMO_RIGHT", (297, 660)), close = point("DEMO_CLOSE", (369, 660))
+        let shots = env["DEMO_SHOTS"] != nil
         let rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
         let offset: [CGFloat] = [0, 0.5, 1.5]
         func key(_ c: Character) -> (CGFloat, CGFloat)? {
             if c == " " { return (230, 856) }
+            if c == "." { return (343, 856) }
             for (r, row) in rows.enumerated() {
                 if let i = row.firstIndex(of: c) {
                     let col = CGFloat(row.distance(from: row.startIndex, to: i))
@@ -231,35 +242,60 @@ final class TypingBench: XCTestCase {
             }
             return nil
         }
-        func type(_ s: String) {
-            for c in s { if let (x, y) = key(c) { at(x, y).tap() } }
+        func type(_ s: String, pause: UInt32 = 0) {
+            for c in s {
+                if let (x, y) = key(c) { at(x, y).tap() }
+                if c == " " && pause > 0 { usleep(pause) }
+            }
         }
+        func step(_ name: String, _ seconds: UInt32) { sleep(seconds); if shots { shot(name) } }
         app.terminate()
-        app.launchArguments = ["-autofocus", "-layout", "qwerty", "-prefill", ""]
+        app.launchArguments = ["-autofocus", "-layout", "qwerty", "-prefill", "", "-alphabet", "japanese",
+                               "-textMode", "letters", "-languages", "en,it,fr,pt", "-autoLanguages", "1"]
         app.launch()
         sleep(2)
-        type("hello wrold ")
+        // 1. Autocorrect, then punctuation that waits for the space.
+        type("hello wrold")
+        step("1-wrold", 1)
+        type(" ")
+        step("2-world", 1)
+        type(".")
+        step("3-dot", 1)
+        type(" ")
+        step("4-dot-space", 1)
+        // 2. Emoji in the bar: "sushi" offers 🍣 in the last slot.
+        type("i love sushi")
+        step("5-sushi", 1)
+        at(right.0, right.1).tap()
+        step("6-emoji", 1)
+        // 3. Detect Language: Italian words switch the bar to Italian.
+        type("domani vado al ", pause: 300_000)
+        step("7-italian", 2)
+        // 4. Long press a suggestion: the grid of alternatives.
+        at(middle.0, middle.1).press(forDuration: 0.8)
+        step("8-grid", 2)
+        at(close.0, close.1).tap()
+        step("9-closed", 1)
+        // 5. Japanese from romaji: the chip, first in the bar.
+        type("watashihanihongowohanasu")
+        step("10-romaji", 1)
+        at(left.0, left.1).tap()
+        step("11-japanese", 2)
+        // 6. Korean (Dubeolsik): the same keys spell 안녕하세요.
+        app.terminate()
+        app.launchArguments = ["-autofocus", "-layout", "qwerty", "-prefill", "", "-alphabet", "korean",
+                               "-textMode", "hangul"]
+        app.launch()
+        sleep(3)
+        type("dkssudgktpdy ")
+        step("12-korean", 2)
+        // Back to the everyday setup for the phone's owner.
+        app.terminate()
+        app.launchArguments = ["-alphabet", "japanese", "-textMode", "letters", "-languages", "en,fr", "-autoLanguages", "1"]
+        app.launch()
         sleep(1)
-        at(343, 856).tap()   // "." right after "world " takes the space away
-        sleep(1)
-        type(" watashihanihongowohanasu")
-        sleep(1)
-        at(77, 610).tap()      // Japanese chip, first in the bar
-        sleep(2)
-        at(30, 855.5).tap()    // 123: numpad
-        sleep(2)
-        at(30, 855.5).tap()    // ABC, same spot
-        sleep(1)
-        at(30, 855.5).press(forDuration: 0.8)
-        sleep(2)
-        for name in ["colemak", "qwertz", "dvorak", "qwerty"] {
-            app.terminate()
-            app.launchArguments = ["-autofocus", "-layout", name]
-            app.launch()
-            sleep(3)
-        }
         // Xcode only keeps the screen recording of failed tests.
-        if ProcessInfo.processInfo.environment["KEEPVIDEO"] != nil { XCTFail("keep the recording") }
+        if env["KEEPVIDEO"] != nil { XCTFail("keep the recording") }
     }
 
     /// Holds the settings key (menu shows in the screen recording), then for

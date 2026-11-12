@@ -13,7 +13,7 @@ settings:
     # Optimized even in Debug: the decoder's per-word loops run ~5x slower
     # unoptimized, which made typing feel laggy.
     SWIFT_OPTIMIZATION_LEVEL: "-O"
-    MARKETING_VERSION: "0.12.0"
+    MARKETING_VERSION: "0.13.0"
     CURRENT_PROJECT_VERSION: "101"
 packages:
   # azooKey's kana-kanji converter (MIT) with its default dictionary.

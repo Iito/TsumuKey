@@ -1,0 +1,60 @@
+# Builds the sideloading IPA (Tools/make_ipa.sh) on a GitHub macOS runner.
+# Unsigned: AltStore, SideStore and the like re-sign it with the user's Apple ID,
+# so no certificates are needed here. A v* tag also attaches it to that release.
+name: IPA
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+    branches: [ci/ipa]
+
+permissions:
+  contents: write
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      # Same Xcode as local builds: swift-collections is pinned for its Swift 6.1.
+      - name: Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app && xcodebuild -version
+
+      - name: Tools
+        run: brew install xcodegen ninja
+
+      # llama.cpp's static libraries only change with the submodule or the script.
+      - name: Submodule commit
+        id: sub
+        run: echo "sha=$(git rev-parse HEAD:Vendor/llama.cpp)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore llama.cpp
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: Vendor/llama-cpu
+          key: llama-${{ steps.sub.outputs.sha }}-${{ hashFiles('Tools/build_llama_ios.sh', 'Tools/llama/module.modulemap') }}
+
+      - name: Build llama.cpp
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: Tools/build_llama_ios.sh
+
+      - name: Build IPA
+        run: Tools/make_ipa.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TsumuKey-ipa
+          path: dist/*.ipa
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "Sideloading IPA (unsigned; AltStore/SideStore re-sign it)."
+          gh release upload "$GITHUB_REF_NAME" dist/*.ipa --clobber

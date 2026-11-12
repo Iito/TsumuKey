@@ -1,13 +1,17 @@
 # Builds the sideloading IPA (Tools/make_ipa.sh) on a GitHub macOS runner.
 # Unsigned: AltStore, SideStore and the like re-sign it with the user's Apple ID,
-# so no certificates are needed here. A v* tag also attaches it to that release.
+# so no certificates are needed here.
+#
+# Releases: tag main vX.Y.Z after a merge -> stable release. Tag a branch
+# vX.Y.Z-rc.N (the version its merge will get) -> pre-release, never "Latest".
+# Notes come from that version's CHANGELOG.md entries. "Run workflow" builds
+# any branch as a downloadable artifact, without a release.
 name: IPA
 
 on:
   workflow_dispatch:
   push:
     tags: ["v*"]
-    branches: [ci/ipa]
 
 permissions:
   contents: write
@@ -16,7 +20,7 @@ jobs:
   ipa:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: true
 
@@ -34,7 +38,7 @@ jobs:
 
       - name: Restore llama.cpp
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: Vendor/llama-cpu
           key: llama-${{ steps.sub.outputs.sha }}-${{ hashFiles('Tools/build_llama_ios.sh', 'Tools/llama/module.modulemap') }}
@@ -46,15 +50,21 @@ jobs:
       - name: Build IPA
         run: Tools/make_ipa.sh
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: TsumuKey-ipa
           path: dist/*.ipa
 
-      - name: Attach to release
+      - name: Release
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "Sideloading IPA (unsigned; AltStore/SideStore re-sign it)."
-          gh release upload "$GITHUB_REF_NAME" dist/*.ipa --clobber
+          Tools/release_notes.sh "$TAG" > notes.md
+          case "$TAG" in *-*) pre=--prerelease ;; *) pre=--latest ;; esac
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/*.ipa --clobber
+          else
+            gh release create "$TAG" dist/*.ipa $pre --title "TsumuKey ${TAG#v}" --notes-file notes.md
+          fi

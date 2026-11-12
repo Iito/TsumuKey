@@ -72,7 +72,7 @@ targets:
     sources:
       - Keyboard
       - Shared
-      # Word list for English, French, German and Spanish.
+      # Word list for English, French, German, Spanish, Italian and Portuguese.
       # Gemma is no longer bundled: the app downloads it on request (Shared/ModelStore.swift).
       - path: Models/lexicon-eu6.bin
         buildPhase: resources

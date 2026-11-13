@@ -14,7 +14,7 @@ settings:
     # unoptimized, which made typing feel laggy.
     SWIFT_OPTIMIZATION_LEVEL: "-O"
     MARKETING_VERSION: "0.13.0"
-    CURRENT_PROJECT_VERSION: "101"
+    CURRENT_PROJECT_VERSION: "103"
 packages:
   # azooKey's kana-kanji converter (MIT) with its default dictionary.
   AzooKeyKanaKanjiConverter:

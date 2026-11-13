@@ -15,6 +15,17 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.13.0 (build 103), 2026-11-13
+- Fix: "of" was corrected to "Ö". The word list counted lone accented letters as words
+  (German ö ä ü, Spanish ñ, and ó ú ô œ æ), because wordfreq counts every letter a text
+  mentions. Only the real one-letter words stay: à (French, German, Portuguese), è
+  (Italian), é (Portuguese). Nothing else in the list changes.
+  Installed on the iPhone 15.
+
+## 0.13.0 (build 102), 2026-11-12
+- Same app as build 101, now labelled 0.13.0 (the version main released it under).
+  Installed on the iPhone 15.
+
 ## 0.13.0 (build 101), 2026-11-12
 Installed on the iPhone 15.
 - Italian and Portuguese: new prediction languages, with a 6-language word list

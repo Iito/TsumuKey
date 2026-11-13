@@ -797,13 +797,23 @@ final class KeyboardState: ObservableObject {
         if found != emojiSuggestion { emojiSuggestion = found }
     }
 
-    /// Types the bar's emoji after the word: "pizza" → "pizza 🍕 ".
+    /// The bar's emoji takes the place of its word: "pizza" → "🍕 ", while the
+    /// word is being typed or just after its space.
     func pickEmoji() {
         guard let emoji = emojiSuggestion else { return }
         emojiSuggestion = nil
         lateFix = nil
         taps = []
-        if !currentWord.isEmpty { insert(" ") }
+        var count = currentWord.count
+        if count == 0 {
+            // Same word refreshEmoji found: the letters before a single space.
+            let before = textBefore
+            if before.hasSuffix(" ") && !before.hasSuffix("  ") {
+                let word = before.dropLast().reversed().prefix { $0.isLetter }
+                if !word.isEmpty { count = word.count + 1 }
+            }
+        }
+        for _ in 0..<count { proxy?.deleteBackward() }
         insertEmoji(emoji)
         insert(" ")
     }

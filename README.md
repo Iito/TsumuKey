@@ -78,7 +78,7 @@ under your finger, accents next to it.
 
 A long press on any word in the bar swaps the keys for a grid of the words that fit,
 the pressed one first; ⌃ closes it. A word that names an emoji ("pizza", "hund",
-"merci") offers it in the last slot of the bar; a tap adds it after the word.
+"merci") offers it in the last slot of the bar; a tap swaps the word for it.
 
 ### Also
 

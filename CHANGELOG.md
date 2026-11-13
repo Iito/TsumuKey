@@ -15,6 +15,13 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.14.0 (build 104), 2026-11-14
+- The bar's emoji replaces its word instead of following it: "pizza" → "🍕 " (was
+  "pizza 🍕 "), both while the word is typed and just after its space.
+- About page (main page, under Set Up): version, links to the GitHub project, releases and
+  issues, and What's New, the user-facing changes per version (App/AboutPage.swift, kept
+  by hand when a version reaches main).
+
 ## 0.13.0 (build 103), 2026-11-13
 - Fix: "of" was corrected to "Ö". The word list counted lone accented letters as words
   (German ö ä ü, Spanish ñ, and ó ú ô œ æ), because wordfreq counts every letter a text

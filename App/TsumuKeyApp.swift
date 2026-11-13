@@ -54,6 +54,7 @@ struct ContentView: View {
                 Section {
                     row("Set Up", "checkmark.shield", .green,
                         report?.fullAccess == true ? "Full Access on" : "Full Access off") { setUpPage }
+                    row("About", "info.circle", .gray, AboutPage.version) { AboutPage() }
                 }
 
                 // Version at the very bottom; matches the entries in CHANGELOG.md.
@@ -468,7 +469,7 @@ extension ContentView {
                 Toggle("Currency conversion", isOn: $settings.currencyConversion)
             } header: {
                 InfoHeader("In the Suggestion Bar", info: [
-                    "Emoji: a word that names one (pizza, dog, merci, hund) offers it in the bar, also just after you finish the word; tap it to add it after the word. In English, French, German and Spanish.",
+                    "Emoji: a word that names one (pizza, dog, merci, hund) offers it in the bar, also just after you finish the word; tap it to swap the word for it. In English, French, German and Spanish.",
                     "Maths results: type a sum and = (12*3=, (4+5)/2 =) and the result shows in the bar; tap it to type it.",
                     "Currency conversion: an amount with $ \u{20AC} \u{00A3} \u{00A5} (100\u{20AC}, $20) shows it in the three main other currencies; tap one to swap. \u{201C}100 usd in chf=\u{201D} converts to any currency the European Central Bank lists.",
                     "Rates: the app fetches the European Central Bank's daily rates, about once a day, only while this is on. The keyboard stays offline. Turning it off deletes the rates.",

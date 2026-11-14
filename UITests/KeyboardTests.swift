@@ -17,12 +17,16 @@ final class KeyboardTests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-autofocus", "-chainWindow", "2.0", "-rowHeight", "44"]
+        // Same keyboard every run: a test that leaves it in Japanese (or
+        // another layout) must not break the next one.
+        app.launchArguments = ["-autofocus", "-chainWindow", "2.0", "-rowHeight", "44",
+                               "-textMode", "letters", "-layout", "qwerty", "-numberRow", "1"]
         app.launch()
         sleep(2)
     }
 
-    private var field: XCUIElement { app.textFields["testField"] }
+    // A multi-line field is a text view on some iOS versions, a text field on others.
+    private var field: XCUIElement { app.descendants(matching: .any)["testField"].firstMatch }
     private var text: String {
         // An empty field reports its placeholder as the value.
         let value = (field.value as? String) ?? ""
@@ -68,10 +72,23 @@ final class KeyboardTests: XCTestCase {
         screenshot("typed")
     }
 
+    func testFixedSpelling() {
+        type("my iphone ")
+        XCTAssertEqual(text, "My iPhone ")
+    }
+
+    func testSwipe() {
+        type("go ")
+        // A quick slide along the top row, t to o, without lifting.
+        letterKey("t").press(forDuration: 0.05, thenDragTo: letterKey("o"))
+        sleep(1)
+        XCTAssertEqual(text, "Go to")
+    }
+
     func testLongPressAccent() {
         type("caf")
-        // "e" popup: [hint "|", é, è, ...]; cells are 34pt, popup clamped to x=4.
-        letterKey("e").press(forDuration: 0.6, thenDragTo: point(x: 4 + 4 + 34 + 17, row: 1))
+        // "e" popup: [hint "|", é, è, ...] in 34pt cells, the first one over the key.
+        letterKey("e").press(forDuration: 0.6, thenDragTo: point(x: 3 + 2.5 * unit + 34, row: 1))
         XCTAssertEqual(text, "Café")
     }
 
@@ -106,11 +123,13 @@ final class KeyboardTests: XCTestCase {
 
     func testEmojiPanel() {
         type("hi ")
-        point(x: 3 + 1.75 * unit, row: 4).tap() // emoji key, right of "123"
+        // Emoji live on the comma's long-press (123, language key, comma);
+        // the menu opens with emoji selected, so lifting picks it.
+        point(x: 3 + 2.75 * unit, row: 4).press(forDuration: 0.7)
         sleep(1)
         screenshot("emoji")
-        // First emoji in the grid.
-        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 30, dy: firstRowY)).tap()
+        // First emoji in the grid, below the search field.
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 28, dy: firstRowY + rowHeight)).tap()
         XCTAssertEqual(text.count, "Hi ".count + 1, "one emoji inserted")
         point(x: 40, row: 4).tap() // ABC
         sleep(1)

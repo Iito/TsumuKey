@@ -39,7 +39,8 @@ final class TypingBench: XCTestCase {
         sleep(2)
     }
 
-    private var field: XCUIElement { app.textFields["testField"] }
+    // A multi-line field is a text view on some iOS versions, a text field on others.
+    private var field: XCUIElement { app.descendants(matching: .any)["testField"].firstMatch }
     private var text: String {
         let value = (field.value as? String) ?? ""
         return value == field.placeholderValue ? "" : value

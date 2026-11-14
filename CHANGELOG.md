@@ -15,6 +15,14 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.14.0 (build 109), 2026-11-14
+- Release build of 0.14.0, same code as build 108.
+- UI tests run again (6 pass on the iPhone 16 Pro simulator): the test field is found by
+  its identifier on every iOS version, each test starts in letters mode on QWERTY with the
+  number row, and the emoji and accent tests follow the new bottom row and popups. New:
+  fixed spellings ("my iphone " → "My iPhone ") and a swipe (t to o types "to").
+- Installed on the iPhone 15.
+
 ## 0.14.0 (build 108), 2026-11-14
 Branch feature/swipe.
 - The bottom row follows the field (Keyboard/FieldKind.swift), from its keyboard type
@@ -46,8 +54,7 @@ Branch feature/swipe.
 - Installed on the iPhone 15.
 
 ## 0.14.0 (build 106), 2026-11-14
-Branch feature/swipe (merged into 0.14.0, not released yet: no version bump; installed
-as 0.15.0 on the iPhone 15 for builds 106-108).
+Branch feature/swipe (installed on the iPhone 15 as 0.15.0 for builds 106-108).
 - Swipe typing (Typing → Swipe typing, on by default): slide across a word's letters
   without lifting. A press on a letter key becomes a swipe once the finger has slid 0.9 key
   widths; a blue trail follows it. On lift, the word goes in with a space before it when

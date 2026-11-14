@@ -73,7 +73,10 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        if host == nil { installHost() }
+        if host == nil {
+            installHost()
+            Domains.loadStorefront()
+        }
         state.emojiSearch = nil
         state.tonePicker = nil
         // Pick up any changes made in the app since the keyboard last opened.

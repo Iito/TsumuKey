@@ -125,6 +125,14 @@ final class Predictor {
         }
     }
 
+    /// Words for a swipe, best first (see WordDecoder.swipe).
+    func swipe(_ request: SwipeRequest, completion: @escaping (SwipeResult) -> Void) {
+        queue.async { [self] in
+            let result = decoder?.swipe(request) ?? SwipeResult(words: [], log: "SWIPE no model")
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
     /// The bar's long-press grid (see WordDecoder.choices).
     func choices(_ request: DecodeRequest, completion: @escaping ([String]) -> Void) {
         queue.async { [self] in

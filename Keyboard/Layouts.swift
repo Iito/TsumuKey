@@ -115,7 +115,8 @@ enum Layouts {
     ].map { Key(action: .text($0.0), alternates: $0.1) }
 
     /// `romaji`: the same keys typing Japanese; ⚙ then leads back to Latin.
-    static func letters(_ settings: KeyboardSettings, showGlobe: Bool, romaji: Bool = false) -> [[RowItem]] {
+    static func letters(_ settings: KeyboardSettings, showGlobe: Bool, romaji: Bool = false,
+                        field: FieldKind = .text) -> [[RowItem]] {
         let rows = settings.layout.rows
 
         // Bottom row: 7 letters between 1.5-wide shift and backspace; more
@@ -165,9 +166,30 @@ enum Layouts {
         bottom += [
             .key(Key(action: .language, hint: romaji ? "A" : settings.asianLanguage.keyHint,
                      alwaysShowHint: true)),
-            .key(Key(action: .text(","), hintIcon: "face.smiling", actions: [.emoji, .oneHanded])),
-            .key(Key(action: .space, units: 10 - fixed)),
-            .key(Key(action: .text("."), hint: "?", alternates: ["?", "!", "…", "/"])),
+        ]
+        // Web addresses and email: "www." or "@" where the comma was (the
+        // comma and emoji on its long-press), domain endings on the period's.
+        switch field {
+        case .text:
+            bottom += [
+                .key(Key(action: .text(","), hintIcon: "face.smiling", actions: [.emoji, .oneHanded])),
+                .key(Key(action: .space, units: 10 - fixed)),
+                .key(Key(action: .text("."), hint: "?", alternates: ["?", "!", "…", "/"])),
+            ]
+        case .url:
+            bottom += [
+                .key(Key(action: .text("www."), hintIcon: "face.smiling", alternates: [","], actions: [.emoji, .oneHanded])),
+                .key(Key(action: .space, units: 10 - fixed)),
+                .key(Key(action: .text("."), alternates: Domains.web)),
+            ]
+        case .email:
+            bottom += [
+                .key(Key(action: .text("@"), hintIcon: "face.smiling", alternates: [","], actions: [.emoji, .oneHanded])),
+                .key(Key(action: .space, units: 10 - fixed)),
+                .key(Key(action: .text("."), alternates: Domains.mail)),
+            ]
+        }
+        bottom += [
             .key(Key(action: .returnKey, units: 1.75)),
         ]
 

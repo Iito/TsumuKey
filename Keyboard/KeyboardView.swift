@@ -95,8 +95,8 @@ struct KeyboardView: View {
     private func rows(width: CGFloat, height: CGFloat) -> some View {
         let base: [[RowItem]]
         switch state.mode {
-        case .letters: base = Layouts.letters(state.settings, showGlobe: state.showGlobe)
-        case .romaji: base = Layouts.letters(state.settings, showGlobe: state.showGlobe, romaji: true)
+        case .letters: base = Layouts.letters(state.settings, showGlobe: state.showGlobe, field: state.field)
+        case .romaji: base = Layouts.letters(state.settings, showGlobe: state.showGlobe, romaji: true, field: state.field)
         case .kana: base = Layouts.kana(showGlobe: state.showGlobe)
         case .hangul:
             base = state.settings.koreanInput == .cheonjiin
@@ -295,7 +295,9 @@ struct KeyView: View {
     @ViewBuilder private var label: some View {
         switch key.action {
         case .text(let s):
-            Text(state.display(s)).font(.system(size: large ? 26 : 21))
+            // "www." fits a key in a smaller size.
+            Text(state.display(s)).font(.system(size: s.count > 1 ? 16 : large ? 26 : 21))
+                .lineLimit(1).minimumScaleFactor(0.6)
         case .shift:
             Image(systemName: state.shift == .locked ? "capslock.fill" : (state.shift == .on ? "shift.fill" : "shift"))
         case .backspace:
@@ -602,7 +604,7 @@ private struct PopupView: View {
                 ForEach(p.options.indices, id: \.self) { i in
                     Group {
                         switch p.options[i] {
-                        case .text(let s): Text(s)
+                        case .text(let s): Text(s).font(.system(size: s.count > 2 ? 17 : 20))
                         case .action(let a):
                             if let title = a.title {
                                 Text(title).font(.system(size: 15, weight: .medium))

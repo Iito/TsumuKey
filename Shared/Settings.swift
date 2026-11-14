@@ -134,6 +134,8 @@ struct KeyboardSettings: Codable, Equatable {
     var capsLock = true
     var periodShortcut = true
     var characterPreview = true
+    /// Swipe typing: slide across the letters of a word without lifting.
+    var swipeTyping = true
     /// Key taps vibrate (and flick or cursor moves tick). Needs Full Access.
     var haptics = true
     var hapticStyle: HapticStyle = .light
@@ -207,6 +209,7 @@ struct KeyboardSettings: Codable, Equatable {
         capsLock = try c.decodeIfPresent(Bool.self, forKey: .capsLock) ?? d.capsLock
         periodShortcut = try c.decodeIfPresent(Bool.self, forKey: .periodShortcut) ?? d.periodShortcut
         characterPreview = try c.decodeIfPresent(Bool.self, forKey: .characterPreview) ?? d.characterPreview
+        swipeTyping = try c.decodeIfPresent(Bool.self, forKey: .swipeTyping) ?? d.swipeTyping
         haptics = try c.decodeIfPresent(Bool.self, forKey: .haptics) ?? d.haptics
         hapticStyle = try c.decodeIfPresent(HapticStyle.self, forKey: .hapticStyle) ?? d.hapticStyle
         hapticStrength = try c.decodeIfPresent(Double.self, forKey: .hapticStrength) ?? d.hapticStrength

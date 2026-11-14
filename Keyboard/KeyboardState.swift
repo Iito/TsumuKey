@@ -378,6 +378,9 @@ final class KeyboardState: ObservableObject {
     private var lastCorrection: (original: String, corrected: String, trigger: String)?
     /// A word whose fix was undone; left alone until the user moves on.
     private var rejectedWord: String?
+    /// The word the last swipe typed (as it is in the text), whether a space
+    /// was added before it, and the runners-up the bar offers instead.
+    private var lastSwipe: (word: String, spaceAdded: Bool, alternatives: [String])?
     /// Words the user kept as typed (undid a fix, or picked "as typed"):
     /// never autocorrected again ("mcp", names, slang). Lowercased.
     private var knownWords = Set(UserDefaults.standard.stringArray(forKey: "knownWords") ?? [])
@@ -392,6 +395,8 @@ final class KeyboardState: ObservableObject {
     /// Return isn't one: a line break is often a deliberate "send as typed".
     private static let correctionTriggers: Set<String> = [" ", ".", ",", "?", "!", ";", ":"]
     @Published var showGlobe = false
+    /// The field's kind (web address, email): changes the bottom row.
+    @Published var field = FieldKind.text
     @Published var settings = KeyboardSettings.load() {
         // The app switched the Japanese keyboard while the other one was up.
         didSet {
@@ -494,6 +499,8 @@ final class KeyboardState: ObservableObject {
 
     func display(_ s: String) -> String {
         guard shift != .off else { return s }
+        // Domain endings and "www." stay lowercase.
+        if s.count > 1, s.first == "." || s.first == "@" || s == "www." { return s }
         if mode == .hangul { return HangulComposer.shifted[s] ?? s }
         let upper = s.uppercased()
         // "ß".uppercased() is "SS"; keep single characters single.
@@ -579,6 +586,8 @@ final class KeyboardState: ObservableObject {
     /// exactly this word, or a missing apostrophe.
     private func applyCorrection(_ word: String) -> (original: String, corrected: String)? {
         guard !word.isEmpty, mode == .letters, autocorrectOn, rejectedWord == nil else { return nil }
+        // A swiped word is already the decoder's pick.
+        guard lastSwipe?.word != word else { return nil }
         // English "i" (and i'm, i'll…) is always capitalized, even if it was once
         // learned by undoing the fix: learned words only protect real words.
         let pronoun = Suggester.pronounI(for: word)
@@ -588,6 +597,8 @@ final class KeyboardState: ObservableObject {
             fix = pronoun
         } else if let contraction = Suggester.contraction(for: word) {
             fix = contraction
+        } else if let cased = WordCasing.fix(for: word) {
+            fix = cased
         } else if correctionWord == word {
             fix = pendingCorrection
         } else if !predictor.isReady {
@@ -618,7 +629,7 @@ final class KeyboardState: ObservableObject {
     /// ("a" → "à" in French), which used to be skipped here.
     private func needsLateFix(_ word: String) -> Bool {
         !word.isEmpty && mode == .letters && autocorrectOn && rejectedWord == nil
-            && !isKnown(word) && predictor.isReady && correctionWord != word
+            && !isKnown(word) && predictor.isReady && correctionWord != word && lastSwipe?.word != word
     }
 
     private func requestLateFix(word: String, taps: [Tap], trigger: String) {
@@ -675,6 +686,7 @@ final class KeyboardState: ObservableObject {
         hangul.reset()
         cheonjiin.reset()
         hangulTaps = []
+        if deleteSwipedWord() { return }
         if !taps.isEmpty { taps.removeLast() }
         if let late = lateFix {
             // Deleting into the finished word means it's being edited by hand.
@@ -975,6 +987,62 @@ final class KeyboardState: ObservableObject {
         insert(suggestion + " ")
     }
 
+    // MARK: Swipe typing
+
+    /// Swipes are read on the Latin letter keyboard only.
+    var swipeEnabled: Bool {
+        settings.swipeTyping && mode == .letters && emojiSearch == nil && predictor.isReady
+    }
+
+    /// A finished swipe: the finger's path over the keys (key-map coordinates).
+    /// The best word goes in with a space before it when the text needs one;
+    /// the bar offers the next ones.
+    func swipe(_ path: [CGPoint]) {
+        guard swipeEnabled, path.count >= 2 else { return }
+        hideChoices()
+        lateFix = nil
+        var spaceAdded = false
+        if let last = textBefore.last, !last.isWhitespace, !"([{\"“‘«¿¡/@#-".contains(last) {
+            // A word being typed is finished first, with its autocorrection.
+            if currentWord.isEmpty { insert(" ") } else { type(" ") }
+            spaceAdded = true
+        }
+        taps = []
+        let before = textBefore
+        let caps = shift
+        predictor.swipe(SwipeRequest(before: before, path: path, keys: keyMap)) { [weak self] result in
+            guard let self, self.textBefore == before, var word = result.words.first else { return }
+            func cased(_ w: String) -> String {
+                switch caps {
+                case .locked: return w.uppercased()
+                // "iPhone" keeps its own capitals at a sentence start.
+                case .on: return w != w.lowercased() ? w : w.prefix(1).uppercased() + w.dropFirst()
+                case .off: return w
+                }
+            }
+            word = cased(word)
+            let alternatives = result.words.dropFirst().prefix(3).map(cased)
+            self.insert(word)
+            self.lastSwipe = (self.currentWord, spaceAdded, Array(alternatives))
+            self.suggestions = Array(alternatives)
+            if caps == .on { self.shift = .off }
+            self.updateAutoShift()
+        }
+    }
+
+    /// Backspace right after a swipe takes the whole word (and the space the
+    /// swipe added). True when it did.
+    private func deleteSwipedWord() -> Bool {
+        guard let s = lastSwipe else { return false }
+        lastSwipe = nil
+        guard textBefore.hasSuffix(s.word) else { return false }
+        var count = s.word.count
+        if s.spaceAdded, textBefore.dropLast(count).hasSuffix(" ") { count += 1 }
+        for _ in 0..<count { proxy?.deleteBackward() }
+        textChanged()
+        return true
+    }
+
     // MARK: Long-press popup
 
     /// What a key does when tapped (released without a long-press).
@@ -1046,7 +1114,7 @@ final class KeyboardState: ObservableObject {
             if s.count == 1, let letter = s.lowercased().first, letter.isLetter || letter == "'" {
                 taps.append(Self.tap(letter, at: point))
             }
-            type(display(s))
+            if s == "www." { insert(s) } else { type(display(s)) }
         case .shift: tapShift()
         case .space: space()
         case .returnKey:
@@ -1084,6 +1152,14 @@ final class KeyboardState: ObservableObject {
     /// sideways from it; to the left on keys too close to the right edge.
     func showPopup(for key: Key, over frame: CGRect) {
         let options = key.actions.map(PopupItem.action) + key.alternates.map(PopupItem.text)
+        // Domain endings: a column, the first one right above the finger.
+        if key.alternates.contains(where: { $0.count > 2 }) {
+            let column = Array(options.reversed())
+            let longest = key.alternates.map(\.count).max() ?? 1
+            showPopup(options: column, over: frame, cellWidth: CGFloat(longest) * 10 + 24,
+                      selected: column.count - 1, vertical: true)
+            return
+        }
         let cell = Popup.defaultCellWidth
         let width = CGFloat(options.count) * cell + 8
         let firstX = frame.midX - cell / 2 - 4          // popup's x with cell 0 over the key
@@ -1182,7 +1258,11 @@ final class KeyboardState: ObservableObject {
                 taps.append(Self.tap(letter, at: nil))
             }
             commitComposition()
-            type(s)
+            if s.count > 1, s.first == "." || s.first == "@" {
+                insertDomain(s)
+            } else {
+                type(s)
+            }
         case .action(.emoji):
             commitComposition()
             mode = .emoji
@@ -1196,6 +1276,19 @@ final class KeyboardState: ObservableObject {
         case .action(.romaji): switchTo(.romaji)
         case .action(.hangul): switchTo(.hangul)
         }
+    }
+
+    /// A domain ending or "@provider" from the period's long-press. An email
+    /// domain replaces whatever was typed after the @ ("ana@gm" → "ana@gmail.com").
+    private func insertDomain(_ s: String) {
+        if s.first == "@" {
+            let token = textBefore.reversed().prefix { !$0.isWhitespace }
+            if let at = token.firstIndex(of: "@") {
+                for _ in 0...token.distance(from: token.startIndex, to: at) { proxy?.deleteBackward() }
+            }
+        }
+        taps = []
+        insert(s)
     }
 
     // MARK: Context
@@ -1250,6 +1343,8 @@ final class KeyboardState: ObservableObject {
     }
 
     func textChanged() {
+        let kind = FieldKind(proxy)
+        if field != kind { field = kind }
         var math: [BarResult] = []
         if !mode.isJapanese, textBefore.hasSuffix("=") || textBefore.hasSuffix("= ") {
             let before = textBefore.trimmingCharacters(in: .whitespaces)
@@ -1328,6 +1423,17 @@ final class KeyboardState: ObservableObject {
             return
         }
         detectLanguages(String(textBefore.dropLast(word.count)))
+        if let s = lastSwipe {
+            if s.word == word, !word.isEmpty {
+                // Just swiped: the bar keeps the runners-up.
+                correctionWord = word
+                if pendingCorrection != nil { pendingCorrection = nil }
+                if suggestions != s.alternatives { suggestions = s.alternatives }
+                return
+            }
+            // Typing on from the swiped word ("word" + "s") makes it a typed word again.
+            if !word.isEmpty || !textBefore.hasSuffix(s.word + " ") { lastSwipe = nil }
+        }
         let request = DecodeRequest(before: String(textBefore.dropLast(word.count)), word: word, taps: taps,
                                     keys: keyMap, autocorrect: autocorrectOn && rejectedWord == nil && !isKnown(word))
         // Mid-word this is the quick estimate only; the full check runs once

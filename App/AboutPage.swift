@@ -50,5 +50,8 @@ enum WhatsNew {
     static let changes = [
         "Tapping the emoji in the bar now replaces its word: \"pizza\" becomes 🍕.",
         "**About** (main settings page): what's new in this version and a link to the project on GitHub.",
+        "**Swipe typing**: slide across a word's letters without lifting. The bar offers the next guesses; backspace removes the whole word. Turn it off in Typing.",
+        "Acronyms and brands come out spelled right (API, PhD, iPhone, YouTube), and are no longer corrected into other words.",
+        "Web address fields get a **www.** key and **.com** and your country's endings on the period's long-press; email fields get **@** and common providers.",
     ]
 }

@@ -365,7 +365,8 @@ extension ContentView {
 
     private var typingSummary: String {
         let toggles = [settings.autocorrect, settings.autoCapitalize, settings.capsLock,
-                       settings.periodShortcut, settings.smartPunctuation, settings.characterPreview]
+                       settings.periodShortcut, settings.smartPunctuation, settings.characterPreview,
+                       settings.swipeTyping]
         let off = toggles.filter { !$0 }.count
         return off == 0 ? "All on" : "\(off) off"
     }
@@ -448,6 +449,7 @@ extension ContentView {
                 Toggle("\u{201C}.\u{201D} shortcut", isOn: $settings.periodShortcut)
                 Toggle("Smart punctuation", isOn: $settings.smartPunctuation)
                 Toggle("Character preview", isOn: $settings.characterPreview)
+                Toggle("Swipe typing", isOn: $settings.swipeTyping)
             } header: {
                 InfoHeader("Typing", info: [
                     "Like the iOS keyboard settings, which iOS doesn't share with other keyboards.",
@@ -456,6 +458,7 @@ extension ContentView {
                     "\u{201C}.\u{201D} shortcut: double-tap space after a word types a full stop and a space.",
                     "Smart punctuation: curly quotes and apostrophes (don\u{2019}t), and -- becomes \u{2014}.",
                     "Character preview: the letter shows above the key you press.",
+                    "Swipe typing: slide from letter to letter without lifting your finger, then lift; the word appears with a space before it. The bar offers the next best words, and backspace right after removes the whole word.",
                 ])
             }
         }

@@ -15,6 +15,59 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.14.0 (build 108), 2026-11-14
+Branch feature/swipe.
+- The bottom row follows the field (Keyboard/FieldKind.swift), from its keyboard type
+  (URL, web search such as Safari's address bar, email) or content type:
+  - web address: "www." where the comma was; long-press on "." offers .com, the
+    country's endings (Japan .jp .co.jp, UK .co.uk .uk .gov.uk, and 20 more), .org,
+    .net, .io and "/";
+  - email: "@" where the comma was; long-press on "." offers @gmail.com, @icloud.com,
+    the country's providers (Japan yahoo.co.jp, docomo, au, SoftBank…), outlook, yahoo,
+    hotmail. Picking one replaces a domain already started after the @.
+  - The comma and emoji stay on the swapped key's long-press. Long lists open as a
+    column, the first choice right above the finger.
+- Country: the App Store's (StoreKit Storefront) when the keyboard can read it, else the
+  region in Settings.
+- Installed on the iPhone 15.
+
+## 0.14.0 (build 107), 2026-11-14
+Branch feature/swipe.
+- Fixed spellings (Keyboard/casing.txt, WordCasing.swift): acronyms (API, PDF, CEO, LLM,
+  MCP, PhD…), brands (iPhone, iOS, YouTube, ChatGPT…) and English days, months, languages
+  and places. Typed, swiped, predicted or picked from the bar, they come out spelled
+  that way ("iphone " → "iPhone "; all capitals stay all capitals), and a listed word is
+  never corrected into another word ("llm" stayed "all" before). Undoing the fix once
+  keeps the word as typed from then on. Left out: spellings that are also everyday words
+  in a supported language (usa, nato, eu, un, ai, os, roi) or in English (us, it, may).
+- Word list rebuilt with `build_lexicon.py --casing`: the acronyms and brands get at least
+  zipf 3.0 in every language, adding llms, kpi, kpis, chatgpt and openai (346,882 words).
+  Swipe bench unchanged (89.0% right, 94.8% in the top 3 on the six-language careful set).
+- Installed on the iPhone 15.
+
+## 0.14.0 (build 106), 2026-11-14
+Branch feature/swipe (merged into 0.14.0, not released yet: no version bump; installed
+as 0.15.0 on the iPhone 15 for builds 106-108).
+- Swipe typing (Typing → Swipe typing, on by default): slide across a word's letters
+  without lifting. A press on a letter key becomes a swipe once the finger has slid 0.9 key
+  widths; a blue trail follows it. On lift, the word goes in with a space before it when
+  the text needs one (a word being typed is finished first, with its autocorrection); the
+  bar offers the next three; backspace right after removes the word and that space.
+- Decoder (Keyboard/SwipeDecoder.swift): words whose letters lie along the path in order,
+  first at the landing point and last at the lift (a walk over the word list, path cost
+  per letter from the key centre's distance, spread 0.45 key), filtered by ideal path
+  length, then a shape check (ideal key-to-key path vs the finger's, 32 points, weight 10)
+  and the small model's context score. Simulated swipes of the Mac test sets (QWERTY):
+  careful 90.0% right, 95.3% in the top 3 (EN 93.1, FR 85.0, DE 90.2, ES 90.8, IT 87.6,
+  PT 90.3); sloppy 74-76%; ~8 ms per swipe on a Mac.
+- Latin letter keyboard only (not Hangul or kana).
+  Installed on the iPhone 15.
+
+## 0.14.0 (build 105), 2026-11-14
+- About shows What's New for the current version only (the earlier versions' lists are
+  gone).
+  Installed on the iPhone 15.
+
 ## 0.14.0 (build 104), 2026-11-14
 - The bar's emoji replaces its word instead of following it: "pizza" → "🍕 " (was
   "pizza 🍕 "), both while the word is typed and just after its space.

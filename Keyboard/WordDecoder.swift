@@ -125,6 +125,7 @@ final class WordDecoder {
             let predictions = ((leadingSpace || context.isEmpty)
                 ? lm.predict(count: 3, leadingSpace: leadingSpace && !context.isEmpty) : [])
                 .filter { Lexicon.key($0).map { lexicon.contains($0, languages: suggestionLanguages) } ?? true }
+                .map(WordCasing.apply)
             return DecodeResult(word: "", correction: nil, suggestions: predictions,
                                 log: "PREDICT \(predictions) \(ms(started, Date()))ms")
         }
@@ -183,7 +184,8 @@ final class WordDecoder {
         let tLM = Date()
 
         var correction: String?
-        if r.autocorrect, let best = fixes.max(by: { total[$0]! < total[$1]! }) {
+        // A listed word ("llm", "mcp") is meant, however rare: only respelled.
+        if r.autocorrect, WordCasing.form(of: typed) == nil, let best = fixes.max(by: { total[$0]! < total[$1]! }) {
             let accentOnly = keyFor(best) == typedKey
             var margin = typedIsWord ? Self.replaceRealWordMargin : typoMargin
             if typedIsWord, enabledZipf(typed) < rareWordZipf { margin = Self.replaceRareWordMargin }
@@ -246,7 +248,7 @@ final class WordDecoder {
             let space = leadingSpace && !context.isEmpty
             let words = lm.predict(count: 12, leadingSpace: space)
                 .filter { Lexicon.key($0).map { lexicon.contains($0, languages: suggestionLanguages) } ?? true }
-            scored = Array(zip(words, lm.score(words, leadingSpace: space)))
+            scored = Array(zip(words.map(WordCasing.apply), lm.score(words, leadingSpace: space)))
         } else {
             let typed = r.word.lowercased()
             guard let typedKey = keyFor(typed) else { return [] }
@@ -439,9 +441,14 @@ final class WordDecoder {
         return z.indices.filter { lexicon.languages & (1 << UInt8($0)) != 0 }.map { z[$0] }.max() ?? 0
     }
 
-    /// A word as it should appear: the typed word's capitals, and English "I".
+    /// A word as it should appear: the typed word's capitals, English "I",
+    /// and fixed spellings ("iPhone", "USA") unless typed in all capitals.
     private func display(_ word: String, like typed: String) -> String {
         if word == "i" || word.hasPrefix("i'") { return "I" + word.dropFirst() }
+        if let form = WordCasing.form(of: word) {
+            let allCaps = typed.count > 1 && typed == typed.uppercased() && typed != typed.lowercased()
+            return allCaps ? word.uppercased() : form
+        }
         return Self.matchCase(of: typed, word)
     }
 

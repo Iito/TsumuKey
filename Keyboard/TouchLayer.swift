@@ -82,6 +82,10 @@ final class TouchView: UIView {
         var holdWork: DispatchWorkItem?
         /// Kana key: index into `flicks` the finger points at now.
         var flick = 0
+        /// Letter key: where the finger has been, for swipe typing.
+        var path: [CGPoint] = []
+        /// Slid far enough from where it landed to be a swipe, not a tap.
+        var swiping = false
         init(_ geo: KeyGeometry, at point: CGPoint) {
             self.geo = geo
             self.point = point
@@ -89,12 +93,27 @@ final class TouchView: UIView {
     }
 
     private var sessions: [ObjectIdentifier: Session] = [:]
+    /// The swipe's trail over the keys.
+    private let trail = CAShapeLayer()
+    /// How far (in key widths) a finger slides before a press becomes a swipe.
+    private static let swipeStart: CGFloat = 0.9
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         isMultipleTouchEnabled = true
         // See KeyboardViewController: fully clear pixels get no touches.
         backgroundColor = UIColor(white: 0.5, alpha: 0.01)
+        trail.fillColor = nil
+        trail.strokeColor = UIColor.systemBlue.withAlphaComponent(0.55).cgColor
+        trail.lineWidth = 7
+        trail.lineCap = .round
+        trail.lineJoin = .round
+        layer.addSublayer(trail)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        trail.frame = bounds
     }
 
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -133,7 +152,7 @@ final class TouchView: UIView {
 
             // Rollover: a new finger types any key still held down, so fast
             // overlapping taps all land, in order.
-            for other in sessions.values where !other.committed && !other.longPressed {
+            for other in sessions.values where !other.committed && !other.longPressed && !other.swiping {
                 guard other.geo.key.action != .backspace else { continue }
                 other.holdWork?.cancel()
                 other.committed = true
@@ -143,6 +162,7 @@ final class TouchView: UIView {
             }
 
             let session = Session(geo, at: p)
+            if Self.isLetter(geo.key), state.swipeEnabled { session.path = [p] }
             sessions[ObjectIdentifier(touch)] = session
             state.keyDown()
             state.pressedKeys.insert(geo.id)
@@ -190,6 +210,10 @@ final class TouchView: UIView {
         for touch in touches {
             guard let session = sessions[ObjectIdentifier(touch)] else { continue }
             let p = touch.location(in: self)
+            if !session.path.isEmpty, !session.longPressed, !session.committed {
+                trackSwipe(session, touch: touch, event: event)
+                if session.swiping { continue }
+            }
             if !session.geo.key.flicks.isEmpty, !session.committed {
                 updateFlick(session, to: CGPoint(x: p.x, y: p.y + Self.aimCorrection))
                 continue
@@ -227,6 +251,11 @@ final class TouchView: UIView {
             session.holdWork?.cancel()
             state.pressedKeys.remove(session.geo.id)
 
+            if session.swiping {
+                fadeTrail()
+                if !cancelled { state.swipe(session.path) }
+                continue
+            }
             if session.geo.key.action == .backspace {
                 state.backspace.up()
             } else if session.longPressed {
@@ -241,6 +270,56 @@ final class TouchView: UIView {
                 state.flickGuide = nil
             }
         }
+    }
+
+    // MARK: Swipe typing
+
+    private static func isLetter(_ key: Key) -> Bool {
+        guard key.flicks.isEmpty, case .text(let s) = key.action, s.count == 1, let c = s.first else { return false }
+        return c.isLetter && c.isASCII
+    }
+
+    /// Records the finger's path on a letter key; once it has slid about a
+    /// key away, the press is a swipe: no letter, no long-press, a trail.
+    private func trackSwipe(_ session: Session, touch: UITouch, event: UIEvent?) {
+        let touches = event?.coalescedTouches(for: touch) ?? [touch]
+        for t in touches {
+            let raw = t.location(in: self)
+            session.path.append(CGPoint(x: raw.x, y: raw.y + Self.aimCorrection))
+        }
+        if !session.swiping, let last = session.path.last, let width = state?.keyMap.keySize.width,
+           hypot(last.x - session.point.x, last.y - session.point.y) > width * Self.swipeStart {
+            session.swiping = true
+            session.holdWork?.cancel()
+            state?.pressedKeys.remove(session.geo.id)
+            state?.popup = nil
+            trail.removeAllAnimations()
+            trail.opacity = 1
+        }
+        guard session.swiping else { return }
+        let path = UIBezierPath()
+        let shown = session.path.suffix(160)
+        path.move(to: shown.first!)
+        for p in shown.dropFirst() { path.addLine(to: p) }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        trail.path = path.cgPath
+        CATransaction.commit()
+    }
+
+    private func fadeTrail() {
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            guard let self, self.trail.opacity == 0 else { return }
+            self.trail.path = nil
+        }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        fade.duration = 0.25
+        trail.opacity = 0
+        trail.add(fade, forKey: "fade")
+        CATransaction.commit()
     }
 
     /// What a key types: for a kana key, the kana the finger flicked to.

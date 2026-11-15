@@ -121,6 +121,19 @@ final class KeyboardTests: XCTestCase {
         XCTAssertTrue(text.count < before - 3 || text.isEmpty, "hold: repeating characters")
     }
 
+    func testHeldDeleteThenTyping() {
+        type("hello world keyboard")
+        sleep(3)
+        backspace.press(forDuration: 0.8)
+        let remaining = text
+        XCTAssertLessThan(remaining.count, "Hello world keyboard".count - 3)
+        // A new word must remain editable after a held delete.
+        type(" hello")
+        XCTAssertEqual(text, remaining + " hello")
+        backspace.tap()
+        XCTAssertEqual(text, remaining + " hell")
+    }
+
     func testEmojiPanel() {
         type("hi ")
         // Emoji live on the comma's long-press (123, language key, comma);

@@ -16,6 +16,8 @@ final class Backspace {
     private var holdFired = false
     private var holdWork: DispatchWorkItem?
     private var repeatTimer: Timer?
+    /// Set only while a repeat deletes text, so other fingers can still type normally.
+    private(set) var repeatInterval: TimeInterval?
 
     init(deleteChar: @escaping () -> Void, deleteWord: @escaping () -> Void) {
         self.deleteChar = deleteChar
@@ -61,6 +63,11 @@ final class Backspace {
     }
 
     private func startRepeating(every interval: TimeInterval, _ action: @escaping () -> Void) {
-        repeatTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in action() }
+        repeatTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return }
+            self.repeatInterval = interval
+            defer { self.repeatInterval = nil }
+            action()
+        }
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 /// Emoji in Unicode's order and groups, with search keywords in English,
 /// French, German, Spanish and Japanese (emoji.tsv, from Unicode 15.0 and
@@ -54,7 +55,7 @@ enum EmojiData {
         return text.split(separator: "\n").compactMap { line in
             let f = line.split(separator: "\t", omittingEmptySubsequences: false)
             guard f.count >= 4, let c = Category(rawValue: String(f[0])) else { return nil }
-            return Entry(emoji: String(f[1]), category: c, keywords: " " + f[2] + " ",
+            return Entry(emoji: String(f[1]), category: c, keywords: (" " + f[2] + " ").precomposedStringWithCanonicalMapping,
                          names: f.count > 4 ? f[4].split(separator: "|").map(String.init) : [],
                          tones: f[3].split(separator: " ").map(String.init))
         }
@@ -109,9 +110,19 @@ enum EmojiData {
         let w = word.lowercased()
         guard w.count >= 3 || w == "ok", !stopWords.contains(w), !w.contains(" ") else { return nil }
         let needle = " \(w) "
+        // NFC keeps byte matching equivalent for composed and decomposed accents.
+        let needleBytes = Array(needle.precomposedStringWithCanonicalMapping.utf8)
+        func contains(_ text: String) -> Bool {
+            text.utf8.withContiguousStorageIfAvailable { haystack in
+                needleBytes.withUnsafeBytes { bytes in
+                    guard let h = haystack.baseAddress, let n = bytes.baseAddress else { return false }
+                    return memmem(h, haystack.count, n, bytes.count) != nil
+                }
+            } ?? text.contains(needle)
+        }
         var best: (rank: Double, emoji: String)?
         var matches = 0
-        for e in entries where e.keywords.contains(needle) {
+        for e in entries where contains(e.keywords) {
             matches += 1
             let rank: Double
             if e.names.contains(w) {

@@ -1371,14 +1371,18 @@ final class KeyboardState: ObservableObject {
     /// for every keystroke, and the clipboard rarely changes mid-sentence.
     private var pasteCheckedAt: CFTimeInterval = 0
 
-    /// Every keystroke, like Gboard: the predictor drops requests that are
-    /// already stale, so fast typing never queues up work. (This used to wait
-    /// for an 80 ms pause, which left the bar frozen during fast typing.)
+    /// Refresh immediately while typing; coalesce repeated deletes to avoid
+    /// predicting words that will disappear before the next repeat.
     private func scheduleRefresh() {
         refreshWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.refreshBar() }
         refreshWork = work
-        DispatchQueue.main.async(execute: work)
+        let pause: TimeInterval = 0.12
+        if let interval = backspace.repeatInterval, interval < pause {
+            DispatchQueue.main.asyncAfter(deadline: .now() + pause, execute: work)
+        } else {
+            DispatchQueue.main.async(execute: work)
+        }
     }
 
     /// Hangul just before the cursor: the word the Korean bar completes.

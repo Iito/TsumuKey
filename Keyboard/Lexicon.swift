@@ -114,10 +114,27 @@ final class Lexicon {
     /// whose text is `key(at:)` of the index passed alongside.
     func walk(step: (Int, UInt8) -> Bool, found: (Int, Int) -> Void) {
         data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
+            // Reuse the mapped buffer for the walk's frequent prefix jumps.
+            func range(_ i: Int) -> Range<Int> {
+                let start = Int(raw.loadUnaligned(fromByteOffset: keyOffsets + i * 4, as: UInt32.self))
+                let end = Int(raw.loadUnaligned(fromByteOffset: keyOffsets + (i + 1) * 4, as: UInt32.self))
+                return (keys + start)..<(keys + end)
+            }
+            func lower(_ bytes: [UInt8]) -> Int {
+                var lo = 0, hi = count
+                while lo < hi {
+                    let mid = (lo + hi) / 2, r = range(mid)
+                    var a = r.lowerBound, b = 0
+                    while a < r.upperBound && b < bytes.count && raw[a] == bytes[b] { a += 1; b += 1 }
+                    let less = a == r.upperBound ? b < bytes.count : (b < bytes.count && raw[a] < bytes[b])
+                    if less { lo = mid + 1 } else { hi = mid }
+                }
+                return lo
+            }
             var path: [UInt8] = []
             var i = 0
             while i < count {
-                let r = keyRange(i)
+                let r = range(i)
                 let key = raw[r]
                 var lcp = 0
                 while lcp < path.count, lcp < key.count, path[lcp] == key[key.startIndex + lcp] { lcp += 1 }
@@ -131,12 +148,12 @@ final class Lexicon {
                     // Jump past every key starting with the pruned prefix.
                     var next = Array(key.prefix(pruned + 1))
                     next[pruned] += 1
-                    i = lowerBound(next)
+                    i = lower(next)
                     continue
                 }
                 found(key.count, i)
                 i += 1
-                while i < count, raw[keyRange(i)].elementsEqual(key) { i += 1 }
+                while i < count, raw[range(i)].elementsEqual(key) { i += 1 }
             }
         }
     }

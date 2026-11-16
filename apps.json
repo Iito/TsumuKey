@@ -59,6 +59,15 @@
       ],
       "versions": [
         {
+          "version": "0.14.1",
+          "buildVersion": "110",
+          "date": "2026-11-16",
+          "localizedDescription": "Suggestions and emoji in the bar come up faster while you type.",
+          "downloadURL": "https://github.com/Iito/TsumuKey/releases/download/v0.14.1/TsumuKey-0.14.1.ipa",
+          "size": 36837888,
+          "minOSVersion": "17.0"
+        },
+        {
           "version": "0.14.0",
           "buildVersion": "109",
           "date": "2026-11-14",

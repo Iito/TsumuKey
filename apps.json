@@ -20,8 +20,53 @@
       "iconURL": "https://iito.github.io/TsumuKey/media/icon.png",
       "tintColor": "C8102E",
       "category": "utilities",
-      "screenshots": [],
+      "screenshots": [
+        {
+          "imageURL": "https://iito.github.io/TsumuKey/media/screenshots/1-languages.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "imageURL": "https://iito.github.io/TsumuKey/media/screenshots/2-japanese.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "imageURL": "https://iito.github.io/TsumuKey/media/screenshots/3-emoji.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "imageURL": "https://iito.github.io/TsumuKey/media/screenshots/4-korean.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "imageURL": "https://iito.github.io/TsumuKey/media/screenshots/5-web.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "imageURL": "https://iito.github.io/TsumuKey/media/screenshots/6-colors.png",
+          "width": 1320,
+          "height": 2868
+        },
+        {
+          "imageURL": "https://iito.github.io/TsumuKey/media/screenshots/7-numpad.png",
+          "width": 1320,
+          "height": 2868
+        }
+      ],
       "versions": [
+        {
+          "version": "0.14.0",
+          "buildVersion": "109",
+          "date": "2026-11-14",
+          "localizedDescription": "Swipe typing: slide across a word's letters without lifting. Acronyms and brands keep their spelling (API, iPhone, ChatGPT). The keyboard follows the field: www. and domain endings in web addresses, @ and mail providers in email fields. The bar's emoji replaces its word. An About page with What's New.",
+          "downloadURL": "https://github.com/Iito/TsumuKey/releases/download/v0.14.0/TsumuKey-0.14.0.ipa",
+          "size": 36839261,
+          "minOSVersion": "17.0"
+        },
         {
           "version": "0.13.0",
           "buildVersion": "101",

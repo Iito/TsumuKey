@@ -46,8 +46,9 @@ struct AboutPage: View {
 /// User-facing changes in this version; replace them when a new version
 /// reaches main (CHANGELOG.md is the build-by-build log).
 enum WhatsNew {
-    static let version = "0.14.0"
+    static let version = "0.14.1"
     static let changes = [
+        "Suggestions and emoji in the bar come up faster while you type.",
         "Tapping the emoji in the bar now replaces its word: \"pizza\" becomes 🍕.",
         "**About** (main settings page): what's new in this version and a link to the project on GitHub.",
         "**Swipe typing**: slide across a word's letters without lifting. The bar offers the next guesses; backspace removes the whole word. Turn it off in Typing.",

@@ -15,6 +15,17 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.14.1 (build 110), 2026-11-16
+Branch perf/faster-dictionary-emoji (PR #3, by sarmientoF).
+- Faster dictionary walk (swipe and word lookups) and emoji suggestions while typing
+  (Keyboard/Lexicon.swift, Keyboard/Emoji.swift). On a Mac (M4): dictionary walk 10.07 →
+  5.87 ms, emoji suggestion 14.01 → 0.97 ms. Not measured on an iPhone yet.
+- Checks: Tools/test_lexicon_walk.swift (the pruned walk finds what a full scan finds, on
+  the European and Korean word lists) and Tools/test_emoji_lookup.swift (613 queries, same
+  emoji as before) pass. UI tests on the iPhone 16 Pro simulator: typing, fixed spellings,
+  swipe and the emoji panel pass; long-press accent (è picked for é) and delete gestures
+  fail, the same as on main.
+
 ## 0.14.0 (build 109), 2026-11-14
 - Release build of 0.14.0, same code as build 108.
 - UI tests run again (6 pass on the iPhone 16 Pro simulator): the test field is found by

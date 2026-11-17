@@ -75,33 +75,6 @@
           "downloadURL": "https://github.com/Iito/TsumuKey/releases/download/v0.14.0/TsumuKey-0.14.0.ipa",
           "size": 36839261,
           "minOSVersion": "17.0"
-        },
-        {
-          "version": "0.13.0",
-          "buildVersion": "101",
-          "date": "2026-11-12",
-          "localizedDescription": "Italian and Portuguese. Detect Language: list several languages and the keyboard follows the two you're typing. Korean keyboards (Dubeolsik and Cheonjiin) with touch-aware autocorrect. Long-press a suggestion for a grid of alternatives. Punctuation waits for a space before attaching. Emoji in the suggestion bar.",
-          "downloadURL": "https://github.com/Iito/TsumuKey/releases/download/v0.13.0/TsumuKey-0.13.0.ipa",
-          "size": 36794335,
-          "minOSVersion": "17.0"
-        },
-        {
-          "version": "0.11.3",
-          "buildVersion": "82",
-          "date": "2026-11-09",
-          "localizedDescription": "Fix for SideStore and AltStore installs: the keyboard now follows the app's settings (languages, colours) instead of its defaults.",
-          "downloadURL": "https://github.com/Iito/TsumuKey/releases/download/v0.11.3/TsumuKey-0.11.3.ipa",
-          "size": 29923555,
-          "minOSVersion": "17.0"
-        },
-        {
-          "version": "0.11.2",
-          "buildVersion": "74",
-          "date": "2026-11-09",
-          "localizedDescription": "Faster next-word suggestions; swapped letters corrected (wrold → world); French accents on one-letter words (a → à); Japanese keyboard can be turned off; nine layouts; maths and currency in the bar.",
-          "downloadURL": "https://github.com/Iito/TsumuKey/releases/download/v0.11.2/TsumuKey-0.11.2.ipa",
-          "size": 29921410,
-          "minOSVersion": "17.0"
         }
       ],
       "appPermissions": {

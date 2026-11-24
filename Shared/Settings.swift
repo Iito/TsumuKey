@@ -475,6 +475,19 @@ struct DeleteTiming: Codable, Equatable {
     /// into a "tap then hold" or "double tap and hold".
     var multiTapWindow: TimeInterval = 0.3
 
+    init() {}
+
+    // Like KeyboardSettings: a missing field (older or newer settings, an
+    // imported file) keeps its default instead of resetting all of them.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = DeleteTiming()
+        holdDelay = try c.decodeIfPresent(TimeInterval.self, forKey: .holdDelay) ?? d.holdDelay
+        charRepeat = try c.decodeIfPresent(TimeInterval.self, forKey: .charRepeat) ?? d.charRepeat
+        wordRepeat = try c.decodeIfPresent(TimeInterval.self, forKey: .wordRepeat) ?? d.wordRepeat
+        multiTapWindow = try c.decodeIfPresent(TimeInterval.self, forKey: .multiTapWindow) ?? d.multiTapWindow
+    }
+
     private static let key = "deleteTiming"
 
     static func load() -> DeleteTiming { SharedSettings.load(Self.self, key: key) ?? DeleteTiming() }

@@ -132,6 +132,11 @@ struct ContentView: View {
                 // UI tests: "-alphabet korean|japanese|none" picks the other alphabet.
                 if let name = UserDefaults.standard.string(forKey: "alphabet"),
                    let a = AsianLanguage(rawValue: name) { settings.asianLanguage = a; settings.save() }
+                // UI tests: "-letterScheme none|all|rows|thumbs" and "-theme system|day|night" (store screenshots).
+                if let name = args.string(forKey: "letterScheme"),
+                   let v = LetterScheme(rawValue: name) { settings.letterColors.scheme = v; settings.save() }
+                if let name = args.string(forKey: "theme"),
+                   let v = KeyboardTheme(rawValue: name) { settings.theme = v; settings.save() }
                 // UI tests: "-japaneseInput kana|romaji" picks the Japanese keyboard.
                 if let name = UserDefaults.standard.string(forKey: "japaneseInput"),
                    let j = JapaneseInput(rawValue: name) { settings.japaneseInput = j; settings.save() }

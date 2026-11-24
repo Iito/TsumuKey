@@ -1378,7 +1378,8 @@ final class KeyboardState: ObservableObject {
         let work = DispatchWorkItem { [weak self] in self?.refreshBar() }
         refreshWork = work
         let pause: TimeInterval = 0.12
-        if let interval = backspace.repeatInterval, interval < pause {
+        // Japanese composition keeps immediate refreshes: its bar follows each kana.
+        if !mode.isJapanese, let interval = backspace.repeatInterval, interval < pause {
             DispatchQueue.main.asyncAfter(deadline: .now() + pause, execute: work)
         } else {
             DispatchQueue.main.async(execute: work)

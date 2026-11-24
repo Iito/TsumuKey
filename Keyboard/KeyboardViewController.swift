@@ -9,8 +9,6 @@ final class KeyboardViewController: UIInputViewController {
     private var host: UIHostingController<AnyView>?
     override func viewDidLoad() {
         super.viewDidLoad()
-        KeyboardLog.installExceptionHook()
-        KeyboardLog.note("load")
         startWatchingSettings()
         state.controller = self
 
@@ -91,7 +89,6 @@ final class KeyboardViewController: UIInputViewController {
                        layout: state.settings.layout.rawValue).save()
         state.mode = state.textMode
         state.textChanged()
-        KeyboardLog.note("open layout=\(state.settings.layout.rawValue)")
     }
 
     /// Rereads the shared settings: on appear, and while open whenever the app
@@ -188,14 +185,12 @@ final class KeyboardViewController: UIInputViewController {
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         removeHost()
-        KeyboardLog.note("close")
     }
 
     private var lastReset = Date.distantPast
 
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
-        KeyboardLog.note("memory warning")
         // iOS sends these often, even with plenty left, and kills the keyboard
         // near 76 MB (iPhone 15), falling back to the previous keyboard. Below
         // 25 MB left, the model and the kana dictionary are dropped and loaded

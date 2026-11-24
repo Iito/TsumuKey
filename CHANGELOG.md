@@ -15,6 +15,32 @@ Rules (from 0.6.0):
   has its own version (v10 = training round 10).
 - Versions before 0.6.0 were set by feel and written with two parts (0.1 to 0.6).
 
+## 0.14.2 (build 115), 2026-11-24
+Installed on iPhone 15 (build 114 was there before). The X key's long-press is now / instead of #,
+because # was already on S.
+
+## 0.14.2 (build 114), 2026-11-24
+Installed on iPhone 15 (0.14.1 build 113 was there before). 0.14.1 was already released, so the
+symbol and memory-log changes below are 0.14.2.
+- Symbols: long-press on the O key (the row-2 position that shows a backtick on Colemak) now
+  offers " first, then `. Long-press on ( and ) adds [ and ] as the second choice. The X key's
+  long-press " is now #.
+- Memory log also records the mode, emoji search start and end, and Japanese dictionary loads
+  and unloads, to find which mode the keyboard crashes in.
+
+## 0.14.1 (build 112), 2026-11-21
+Installed on iPhone 15 (build 111 was there before).
+- Keyboard memory log: each open, close, memory warning and model load/unload is saved in the
+  app group (key keyboardLog, 300 lines), with footprint and available memory. Uncaught
+  Objective-C exceptions are recorded with their name and reason before the crash. For
+  debugging the crashes; pull it with devicectl.
+
+## 0.14.1 (build 111), 2026-11-19
+Installed on iPhone 15 (build 109 was there before).
+- Currency rates: a Download rates / Update rates button in the Suggestion Bar settings. On
+  mobile data it asks before downloading. Automatic updates (on open, daily) wait for Wi-Fi.
+- Also in this build, not yet committed: settings backup (App/SettingsBackup.swift).
+
 ## 0.14.1 (build 110), 2026-11-16
 Branch perf/faster-dictionary-emoji (PR #3, by sarmientoF).
 - Faster dictionary walk (swipe and word lookups) and emoji suggestions while typing

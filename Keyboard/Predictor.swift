@@ -34,7 +34,6 @@ final class Predictor {
             }
             decoder = WordDecoder(lm: lm, lexicon: lexicon)
             apply()
-            KeyboardLog.note("model loaded")
             DispatchQueue.main.async { self.isReady = true }
         }
     }
@@ -95,10 +94,7 @@ final class Predictor {
     /// Frees the model; the next `load` brings it back.
     func unload() {
         isReady = false
-        queue.async { [self] in
-            decoder = nil
-            KeyboardLog.note("model unloaded")
-        }
+        queue.async { [self] in decoder = nil }
     }
 
     /// Quick bar update while a word is being typed.

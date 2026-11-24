@@ -637,6 +637,8 @@ extension ContentView {
                 ])
             }
             .font(.callout)
+
+            BackupSection(settings: $settings, timing: $timing)
         }
     }
 }

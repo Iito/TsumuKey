@@ -79,8 +79,8 @@ enum Layouts {
     // hint; the rest only show on long-press.
     private static let positionSymbols: [[[String]]] = [
         [["%"], ["\\", "~"], ["|"], ["=", "≠", "^"], ["["], ["]"], ["<", "«"], [">", "»"], ["{"], ["}"]],
-        [["@"], ["#"], [currencySlot], ["_"], ["&"], ["-"], ["+"], ["("], [")"], ["`"]],
-        [["*"], ["\""], ["'"], [":"], [";"], ["!"], ["?"]],
+        [["@"], ["#"], [currencySlot], ["_"], ["&"], ["-"], ["+"], ["(", "["], [")", "]"], ["\"", "`"]],
+        [["*"], ["/"], ["'"], [":"], [";"], ["!"], ["?"]],
     ]
 
     // Accents follow the letter. French variants come first because they are

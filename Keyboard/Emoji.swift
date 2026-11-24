@@ -3,7 +3,7 @@ import Darwin
 
 /// Emoji in Unicode's order and groups, with search keywords in English,
 /// French, German, Spanish and Japanese (emoji.tsv, from Unicode 15.0 and
-/// CLDR, what iOS 17 can draw).
+/// CLDR; iOS 18, the oldest supported, draws all of it).
 enum EmojiData {
     enum Category: String, CaseIterable, Identifiable {
         case recents, smileys, people, animals, food, travel, activities, objects, symbols, flags

@@ -49,7 +49,9 @@ struct FlickGuide: Equatable {
 
 final class KeyboardState: ObservableObject {
     static let shared = KeyboardState()
-    @Published var mode: KeyboardMode = .letters
+    @Published var mode: KeyboardMode = .letters {
+        didSet { KeyboardLog.note("mode \(mode)") }
+    }
     /// Latin or kana: where the numpad and emoji panel go back to, and what
     /// the keyboard opens with. Remembered across launches.
     var textMode: KeyboardMode = KeyboardState.takeStartMode() ?? UserDefaults.standard.string(forKey: "textMode")
@@ -96,6 +98,7 @@ final class KeyboardState: ObservableObject {
     /// The ABC keyboard can keep the kana dictionary too (Japanese chip):
     /// it adds ~4 MB next to the model's ~30.
     func loadEngines() {
+        KeyboardLog.note("engines for \(textMode) kana=\(KanaConverter.shared.isLoaded) ranker=\(predictor.isReady)")
         if textMode.isJapanese {
             predictor.unload()
             KanaConverter.shared.load()
@@ -420,12 +423,14 @@ final class KeyboardState: ObservableObject {
     @Published var tonePicker: [String]?
 
     func startEmojiSearch() {
+        KeyboardLog.note("emoji search start")
         emojiSearch = ""
         shift = .off
         mode = .letters
     }
 
     func endEmojiSearch() {
+        KeyboardLog.note("emoji search end")
         emojiSearch = nil
         tonePicker = nil
         mode = .emoji

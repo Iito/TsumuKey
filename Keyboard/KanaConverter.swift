@@ -30,10 +30,15 @@ final class KanaConverter {
         )
     }()
 
+    /// Whether the dictionary is in memory. Read on the main thread, so it
+    /// waits for any load or unload already queued.
+    var isLoaded: Bool { queue.sync { converter != nil } }
+
     func load() {
         queue.async {
             guard self.converter == nil else { return }
             self.converter = KanaKanjiConverter.withDefaultDictionary()
+            KeyboardLog.note("kana loaded")
         }
     }
 
@@ -43,6 +48,7 @@ final class KanaConverter {
             guard let converter = self.converter else { return }
             converter.commitUpdateLearningData()
             self.converter = nil
+            KeyboardLog.note("kana unloaded")
         }
     }
 

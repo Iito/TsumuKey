@@ -255,6 +255,10 @@ final class TypingBench: XCTestCase {
                                "-textMode", "letters", "-languages", "en,it,fr,pt", "-autoLanguages", "1"]
         app.launch()
         sleep(2)
+        // A fresh simulator often opens Apple's keyboard even with TsumuKey
+        // listed first: its globe switches over, and iOS remembers the choice.
+        let globe = app.keyboards.buttons["Next keyboard"]
+        if globe.exists { globe.tap(); sleep(1) }
         // 1. Autocorrect, then punctuation that waits for the space.
         type("hello wrold")
         step("1-wrold", 1)
@@ -342,6 +346,194 @@ final class TypingBench: XCTestCase {
         app.launchArguments = ["-numberRow", "1", "-symbolHints", "1"]
         app.launch()
         sleep(2)
+    }
+
+    /// Store screenshots in the simulator's Messages (iPhone 16 Pro Max, TsumuKey
+    /// picked as the keyboard, QWERTY with the number row; contacts Giulia, Yuki
+    /// and Minji added with simctl addmedia). Each chat gets a couple of sent
+    /// messages for context (typeText, bypassing the keyboard), then the shown
+    /// text is typed on TsumuKey.
+    func testStoreScenes() throws {
+        let rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"]
+        let offset: [CGFloat] = [0, 0.5, 1.5]
+        let m = XCUIApplication(bundleIdentifier: "com.apple.MobileSMS")
+        func at(_ x: CGFloat, _ y: CGFloat) -> XCUICoordinate {
+            // SpringBoard's coordinates: the screen, whichever app is in front.
+            XCUIApplication(bundleIdentifier: "com.apple.springboard").coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: x, dy: y))
+        }
+        func keys(_ text: String) {
+            for c in text {
+                var p: (CGFloat, CGFloat) = c == "," ? (121, 856) : c == "." ? (343, 856) : (230, 856)
+                if let d = "1234567890".firstIndex(of: c) {
+                    p = (3 + (CGFloat("1234567890".distance(from: "1234567890".startIndex, to: d)) + 0.5) * 43.4, 655)
+                }
+                for (i, row) in rows.enumerated() {
+                    if let j = row.firstIndex(of: c) {
+                        p = (3 + (offset[i] + CGFloat(row.distance(from: row.startIndex, to: j)) + 0.5) * 43.4, 706 + CGFloat(i) * 50)
+                    }
+                }
+                at(p.0, p.1).tap()
+                if c == " " { usleep(120_000) }
+            }
+        }
+        func settings(_ args: [String]) {
+            app.terminate()
+            app.launchArguments = ["-layout", "qwerty", "-numberRow", "1"] + args
+            app.launch(); sleep(2); app.terminate()
+        }
+        // The message box is the lowest text input (a new chat also has "To:").
+        var body: XCUIElement {
+            let inputs = m.textViews.allElementsBoundByIndex + m.textFields.allElementsBoundByIndex
+            return inputs.filter { $0.exists && $0.frame.height > 0 }.max { $0.frame.minY < $1.frame.minY } ?? m.textViews.firstMatch
+        }
+        func sendTap() {
+            let button = m.buttons["sendButton"]
+            if button.exists { button.tap() } else { let f = body.frame; at(f.maxX - 18, f.midY).tap() }
+            sleep(2)
+        }
+        // Drafts left by earlier runs.
+        func clear() {
+            guard let v = body.value as? String, !v.isEmpty, v != body.placeholderValue else { return }
+            body.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: v.count + 4))
+            sleep(1)
+        }
+        // Opens a chat from the list (an sms: link opens a New Message sheet
+        // whose recipient never resolves in the simulator).
+        func chat(_ name: String, _ number: String) {
+            m.activate(); sleep(2)
+            if m.buttons["OK"].exists { m.buttons["OK"].tap(); sleep(1) }
+            if m.buttons["Cancel"].exists { m.buttons["Cancel"].tap(); sleep(1) }
+            if m.sheets.buttons["Delete Draft"].exists { m.sheets.buttons["Delete Draft"].tap(); sleep(1) }
+            if !m.collectionViews["ConversationList"].exists { m.navigationBars.buttons.element(boundBy: 0).tap(); sleep(1) }
+            m.cells.matching(NSPredicate(format: "label CONTAINS %@ OR label CONTAINS %@", name, number)).firstMatch.tap()
+            sleep(2)
+            body.tap(); sleep(1)
+            clear()
+            // After a simulator restart iOS may bring back Apple's keyboard (its
+            // keys are visible to the test, TsumuKey's aren't): its globe,
+            // bottom left below the keys, switches to TsumuKey.
+            // Messages also remembers a keyboard per chat: tap until it's TsumuKey.
+            for _ in 0..<5 where m.keyboards.keys.count > 10 { at(42, 913).tap(); sleep(1) }
+        }
+        // Context messages go out once; reruns find them already in the chat.
+        func send(_ text: String) {
+            guard !m.staticTexts[text].exists else { return }
+            body.typeText(text); sleep(1)
+            sendTap()
+        }
+        let barY: CGFloat = 610
+        let scene = ProcessInfo.processInfo.environment["SCENE"] ?? "latin"
+
+        let es = ["-alphabet", "japanese", "-textMode", "letters", "-languages", "en,es", "-autoLanguages", "1"]
+        // Numpad page keys (points): columns and rows.
+        let padX: [CGFloat] = [44, 131, 220, 308, 396], padY: [CGFloat] = [662, 725, 787, 849]
+        func pad(_ text: String) {
+            let grid = ["+123", "-456", "*789", "A,0."]
+            for c in text {
+                for (r, row) in grid.enumerated() {
+                    if let j = row.firstIndex(of: c) { at(padX[row.distance(from: row.startIndex, to: j)], padY[r]).tap() }
+                }
+            }
+        }
+
+        if scene == "latin" {
+            // Lucía (incoming, drawn: "¿Cenamos el sábado? 🍝"): Spanish, then a
+            // Japanese place whose chip isn't the kanji: 目白 is in the dropdown.
+            settings(es)
+            chat("Lucía", "555-1212")
+            keys("vale, nos vemos en mejiro")
+            sleep(2)
+            at(412, barY).tap(); sleep(1)     // ⌄ opens the other conversions
+            shot("scene-languages")
+            at(412, barY).tap(); sleep(1)
+
+            // Numpad (incoming, drawn: "How much do I owe you?").
+            body.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 40)); sleep(1)
+            keys("your share is ")
+            at(40, 856).tap(); sleep(1)       // 123: the numpad
+            pad("16.20")
+            sleep(1)
+            shot("scene-numpad")
+            m.terminate()
+
+            // Yuki (incoming, drawn: "何時ごろ着く？"): mixed English and Japanese,
+            // then an emoji for the food.
+            chat("Yuki", "564-8583")
+            keys("im on my way, 7")
+            at(3 + 5 * 43.4, 806).press(forDuration: 0.7)   // v: its long-press gives ":"
+            keys("30gurai")
+            sleep(2)
+            shot("scene-japanese-abc")
+            at(107, barY).tap(); sleep(1)     // the Japanese chip, first in the bar
+            sendTap()
+            keys("im craving curry ")
+            sleep(2)
+            shot("scene-emoji")
+            m.terminate()
+        } else if scene == "theme" {
+            // Dark mode (set from the shell), letters coloured by thumb.
+            settings(es + ["-letterScheme", "thumbs", "-theme", "night"])
+            chat("Lucía", "555-1212")
+            keys("yes, running a bit late ")
+            sleep(2)
+            shot("scene-theme")
+            m.terminate()
+            settings(["-letterScheme", "none", "-theme", "system"])
+        } else if scene == "web" {
+            // Safari's address bar: "www." in the comma's place, and the
+            // long-press on "." (screenshotted from the shell while held).
+            settings(es)
+            let sf = XCUIApplication(bundleIdentifier: "com.apple.mobilesafari")
+            sf.activate(); sleep(3)
+            let bar = sf.textFields["Address"].exists ? sf.textFields["Address"] : sf.buttons["Address"]
+            if bar.exists { bar.tap() } else { sf.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.91)).tap() }
+            sleep(2)
+            for _ in 0..<5 where sf.keyboards.keys.count > 10 { at(42, 913).tap(); sleep(1) }
+            keys("tsumukey.github")
+            sleep(1)
+            shot("scene-web-typing")
+            print("HOLD-START")
+            at(343, 856).press(forDuration: 6)
+            print("HOLD-END")
+            sleep(1)
+            shot("scene-web-after")
+            sf.terminate()
+        } else if scene == "places" {
+            settings(["-alphabet", "japanese", "-textMode", "letters", "-languages", "en,es", "-autoLanguages", "1"])
+            chat("Giulia", "555-1212")
+            for place in (ProcessInfo.processInfo.environment["PLACES"] ?? "mejiro").split(separator: ",").map(String.init) {
+                body.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 60)); sleep(1)
+                keys("vale, nos vemos en " + place); sleep(2)
+                shot("place-" + place)
+                at(412, barY).tap(); sleep(1)
+                shot("placemore-" + place)
+                at(412, barY).tap(); sleep(1)
+            }
+            m.terminate()
+        } else {
+            // Minji (the Yuki chat with the contact renamed; incoming, drawn:
+            // "내일 시간 있어?"): Dubeolsik, 응 좋아.
+            settings(["-alphabet", "korean", "-textMode", "hangul", "-languages", "en,fr,it", "-autoLanguages", "1"])
+            chat("Minji", "564-8583")
+            keys("dmd whgdk")
+            sleep(2)
+            shot("scene-korean")
+            m.terminate()
+        }
+
+        settings(["-alphabet", "japanese", "-textMode", "letters", "-languages", "en,fr", "-autoLanguages", "1"])
+    }
+
+    /// Advanced → Back Up: Export opens the save dialog; saving and importing
+    /// the file back are checked by hand (the Files picker isn't scriptable).
+    func testExportSettings() throws {
+        app.swipeUp(); app.swipeUp(); app.swipeUp()
+        sleep(1)
+        shot("backup-section")
+        let export = app.buttons["Export settings"].firstMatch
+        export.tap()
+        sleep(6)
+        shot("backup-share")
     }
 
     private func shot(_ name: String) {

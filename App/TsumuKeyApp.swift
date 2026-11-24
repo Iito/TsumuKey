@@ -18,6 +18,7 @@ struct ContentView: View {
     @State private var report = KeyboardReport.load()
     @FocusState private var fieldFocused: Bool
     @State private var advancedOpen = false
+    @State private var ratesOnMobileData = false
 
     var body: some View {
         NavigationStack {
@@ -81,9 +82,8 @@ struct ContentView: View {
             .onChange(of: settings) { old, new in
                 new.save()
                 guard old.currencyConversion != new.currencyConversion else { return }
-                if new.currencyConversion {
-                    Task { await RatesFetcher.fetch(); RatesFetcher.schedule() }
-                } else {
+                // Turning it on is handled by barPage, which asks before using mobile data.
+                if !new.currencyConversion {
                     CurrencyRates.clear()
                     RatesFetcher.schedule()
                 }
@@ -475,20 +475,44 @@ extension ContentView {
                 Toggle("Emoji", isOn: $settings.emojiSuggestions)
                 Toggle("Maths results", isOn: $settings.mathResults)
                 Toggle("Currency conversion", isOn: $settings.currencyConversion)
+                if settings.currencyConversion {
+                    Button(CurrencyRates.load() == nil ? "Download rates" : "Update rates") {
+                        fetchRates(allowCellular: false)
+                    }
+                }
             } header: {
                 InfoHeader("In the Suggestion Bar", info: [
                     "Emoji: a word that names one (pizza, dog, merci, hund) offers it in the bar, also just after you finish the word; tap it to swap the word for it. In English, French, German and Spanish.",
                     "Maths results: type a sum and = (12*3=, (4+5)/2 =) and the result shows in the bar; tap it to type it.",
                     "Currency conversion: an amount with $ \u{20AC} \u{00A3} \u{00A5} (100\u{20AC}, $20) shows it in the three main other currencies; tap one to swap. \u{201C}100 usd in chf=\u{201D} converts to any currency the European Central Bank lists.",
-                    "Rates: the app fetches the European Central Bank's daily rates, about once a day, only while this is on. The keyboard stays offline. Turning it off deletes the rates.",
+                    "Rates: the app fetches the European Central Bank's daily rates, about once a day, only while this is on. Automatic updates wait for Wi-Fi; on mobile data, tap Download or Update rates. The keyboard stays offline. Turning it off deletes the rates.",
                 ])
             } footer: {
                 if settings.currencyConversion, let rates = CurrencyRates.load() {
                     Text("Rates from \(rates.date.formatted(date: .abbreviated, time: .omitted)).")
                 } else if settings.currencyConversion {
-                    Text("No rates yet: they download when you're online.")
+                    Text("No rates yet: tap Download rates. On mobile data the app asks first.")
                 }
             }
+            .alert("Download rates on mobile data?", isPresented: $ratesOnMobileData) {
+                Button("Download") { fetchRates(allowCellular: true) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You're not on Wi-Fi. The rates are one small file from the European Central Bank.")
+            }
+            .onChange(of: settings.currencyConversion) { _, on in
+                if on { fetchRates(allowCellular: false) }
+            }
+        }
+    }
+
+    /// Downloads the rates now. Without `allowCellular` on mobile data, iOS
+    /// refuses the request and the app asks first.
+    private func fetchRates(allowCellular: Bool) {
+        Task {
+            let result = await RatesFetcher.fetch(allowCellular: allowCellular)
+            if result == .blockedOnMobileData { ratesOnMobileData = true }
+            RatesFetcher.schedule()
         }
     }
 

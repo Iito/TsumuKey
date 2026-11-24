@@ -8,21 +8,39 @@ enum RatesFetcher {
     /// Also listed in Info.plist (BGTaskSchedulerPermittedIdentifiers).
     static let taskID = "tsumukey-rates"
 
-    /// Fetches when on and the saved rates are older than 12 hours.
+    enum FetchResult: Equatable {
+        case saved
+        /// Not on Wi-Fi and the user hasn't allowed mobile data for this download.
+        case blockedOnMobileData
+        case failed
+    }
+
+    /// Fetches when on and the saved rates are older than 12 hours. Automatic
+    /// fetches never use mobile data; the user taps Download for that.
     static func refreshIfNeeded() async {
         guard KeyboardSettings.load().currencyConversion else { return }
         if let saved = CurrencyRates.load(), Date().timeIntervalSince(saved.date) < 12 * 3600 { return }
-        await fetch()
+        _ = await fetch(allowCellular: false)
         schedule()
     }
 
-    static func fetch() async {
+    /// `allowCellular` false: iOS refuses the request on mobile data, which
+    /// comes back as `.blockedOnMobileData` so the caller can ask first.
+    static func fetch(allowCellular: Bool) async -> FetchResult {
         var request = URLRequest(url: CurrencyRates.source, timeoutInterval: 20)
         request.setValue("TsumuKey", forHTTPHeaderField: "User-Agent")
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
-              (response as? HTTPURLResponse)?.statusCode == 200,
-              let rates = CurrencyRates(ecbXML: String(decoding: data, as: UTF8.self)) else { return }
-        rates.save()
+        request.allowsCellularAccess = allowCellular
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  let rates = CurrencyRates(ecbXML: String(decoding: data, as: UTF8.self)) else { return .failed }
+            rates.save()
+            return .saved
+        } catch let error as URLError where error.code == .dataNotAllowed {
+            return .blockedOnMobileData
+        } catch {
+            return .failed
+        }
     }
 
     static func schedule() {

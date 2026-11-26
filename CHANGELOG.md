@@ -27,6 +27,9 @@ Rules (from 0.6.0):
 ## Phone builds for 0.14.2 (not in the release notes)
 Builds installed on iPhone 15 while 0.14.2 was in development.
 
+- Build 117: a crash report for the keyboard, saved in the app group's CrashReports folder. It
+  covers uncaught exceptions, fatal signals, and an open keyboard that was ended without a close
+  (for example by iOS for memory). Built on the memory-log branch, on top of 0.14.2 (build 116).
 - Build 115: the X key's long-press is / instead of #, because # was already on S.
 - Build 114: the symbol changes above, plus a memory log for debugging crashes. The memory log
   isn't in the release; it's on the `memory-log` branch.
